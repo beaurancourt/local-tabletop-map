@@ -35,6 +35,7 @@ export const createDefaultState = (): AppState => ({
   },
   calibration: {
     pixelsPerInch: 96, // Default screen DPI
+    savedPixelsPerInch: 96, // Saved calibration (Shift+R resets to this)
   },
 });
 

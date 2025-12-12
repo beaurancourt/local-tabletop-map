@@ -182,7 +182,47 @@ export function DMView() {
         }
       }
 
+      // Viewport size adjustment (no shift required) - only when not in calibration mode
+      // - decreases size (lower PPI = smaller), = increases size (higher PPI = bigger)
+      if (!gridCalibration?.active) {
+        if (e.key === '-') {
+          e.preventDefault();
+          setState(prev => ({
+            ...prev,
+            calibration: {
+              ...prev.calibration,
+              pixelsPerInch: prev.calibration.pixelsPerInch + 5,
+            },
+          }));
+          return;
+        }
+        if (e.key === '=') {
+          e.preventDefault();
+          setState(prev => ({
+            ...prev,
+            calibration: {
+              ...prev.calibration,
+              pixelsPerInch: Math.max(10, prev.calibration.pixelsPerInch - 5),
+            },
+          }));
+          return;
+        }
+      }
+
       if (!e.shiftKey) return;
+
+      // Shift+R to reset viewport to saved calibration
+      if (e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        setState(prev => ({
+          ...prev,
+          calibration: {
+            ...prev.calibration,
+            pixelsPerInch: prev.calibration.savedPixelsPerInch,
+          },
+        }));
+        return;
+      }
 
       // Shift+G to start grid calibration
       if (e.key.toLowerCase() === 'g') {
@@ -482,6 +522,26 @@ export function DMView() {
     setState(prev => ({ ...prev, calibration: { ...prev.calibration, pixelsPerInch: ppi } }));
   };
 
+  const handleSaveCalibration = () => {
+    setState(prev => ({
+      ...prev,
+      calibration: {
+        ...prev.calibration,
+        savedPixelsPerInch: prev.calibration.pixelsPerInch,
+      },
+    }));
+  };
+
+  const handleResetCalibration = () => {
+    setState(prev => ({
+      ...prev,
+      calibration: {
+        ...prev.calibration,
+        pixelsPerInch: prev.calibration.savedPixelsPerInch,
+      },
+    }));
+  };
+
   return (
     <div className="dm-view">
       {/* Grid Calibration Mode Indicator */}
@@ -541,6 +601,8 @@ export function DMView() {
               calibration={state.calibration}
               map={state.map}
               onPixelsPerInchChange={handlePixelsPerInchChange}
+              onSaveCalibration={handleSaveCalibration}
+              onResetCalibration={handleResetCalibration}
             />
           </div>
         )}

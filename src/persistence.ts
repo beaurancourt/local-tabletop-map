@@ -95,6 +95,9 @@ export function applySavedState(
     drawings: savedState.drawings,
     view: savedState.view,
     playerViewOffset: savedState.playerViewOffset,
-    calibration: savedState.calibration,
+    calibration: {
+      pixelsPerInch: savedState.calibration.pixelsPerInch,
+      savedPixelsPerInch: savedState.calibration.savedPixelsPerInch ?? savedState.calibration.pixelsPerInch,
+    },
   };
 }

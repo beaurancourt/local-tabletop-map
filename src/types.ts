@@ -43,7 +43,8 @@ export interface ViewState {
 }
 
 export interface CalibrationState {
-  pixelsPerInch: number; // For player view calibration
+  pixelsPerInch: number; // For player view calibration (current/active value)
+  savedPixelsPerInch: number; // Saved calibration value (Shift+R resets to this)
 }
 
 export interface PlayerViewport {

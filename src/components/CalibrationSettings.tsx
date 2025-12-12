@@ -4,13 +4,19 @@ interface CalibrationSettingsProps {
   calibration: CalibrationState;
   map: MapState;
   onPixelsPerInchChange: (ppi: number) => void;
+  onSaveCalibration: () => void;
+  onResetCalibration: () => void;
 }
 
 export function CalibrationSettings({
   calibration,
   map,
   onPixelsPerInchChange,
+  onSaveCalibration,
+  onResetCalibration,
 }: CalibrationSettingsProps) {
+  const isModified = calibration.pixelsPerInch !== calibration.savedPixelsPerInch;
+
   return (
     <div className="settings-panel">
       <h3>Player View Calibration</h3>
@@ -22,11 +28,26 @@ export function CalibrationSettings({
         <label>Pixels per inch:</label>
         <input
           type="number"
-          min="50"
-          max="300"
+          min="10"
+          max="500"
           value={calibration.pixelsPerInch}
           onChange={(e) => onPixelsPerInchChange(parseInt(e.target.value) || 96)}
         />
+      </div>
+
+      <div className="setting-row">
+        <label>Saved:</label>
+        <span>{calibration.savedPixelsPerInch} PPI</span>
+        {isModified && <span style={{ color: '#ff9900', marginLeft: 8 }}>(modified)</span>}
+      </div>
+
+      <div className="setting-row">
+        <button onClick={onSaveCalibration} disabled={!isModified}>
+          Save
+        </button>
+        <button onClick={onResetCalibration} disabled={!isModified}>
+          Reset (Shift+R)
+        </button>
       </div>
 
       {map.gridSize > 0 && (
@@ -37,18 +58,18 @@ export function CalibrationSettings({
       )}
 
       <div className="calibration-helper">
-        <p>To calibrate:</p>
+        <p><strong>Keyboard shortcuts:</strong></p>
+        <ul>
+          <li><strong>-</strong> / <strong>=</strong> : Decrease / Increase viewport size</li>
+          <li><strong>Shift+R</strong> : Reset to saved value</li>
+        </ul>
+        <p style={{ marginTop: 8 }}><strong>To calibrate:</strong></p>
         <ol>
           <li>Open player view on your TV</li>
           <li>Measure a grid square with a ruler</li>
-          <li>Adjust pixels-per-inch until 1 square = 1 inch</li>
+          <li>Use - / = keys until 1 square = 1 inch</li>
+          <li>Click Save to remember this calibration</li>
         </ol>
-        <p><strong>Common values:</strong></p>
-        <ul>
-          <li>55" 4K TV: ~80 PPI</li>
-          <li>65" 4K TV: ~68 PPI</li>
-          <li>75" 4K TV: ~59 PPI</li>
-        </ul>
       </div>
     </div>
   );
