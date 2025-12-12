@@ -6,7 +6,7 @@ import { MapCanvas } from '../components/MapCanvas';
 import { Toolbar } from '../components/Toolbar';
 import { GridSettings } from '../components/GridSettings';
 import { CalibrationSettings } from '../components/CalibrationSettings';
-import { AppState, Tool, ToolState, PlayerViewport, FogState, Drawing } from '../types';
+import { AppState, ToolState, PlayerViewport, FogState, Drawing } from '../types';
 import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync } from '../store';
 import { saveMapState, loadMapState, applySavedState } from '../persistence';
 import {
@@ -45,6 +45,9 @@ export function DMView() {
 
   // Track held keys for continuous panning with diagonal support
   const keysHeld = useRef<Set<string>>(new Set());
+
+  // Ref for clear drawings handler (for keyboard shortcut)
+  const handleClearDrawingsRef = useRef<() => void>(() => {});
 
   // Undo function
   const undo = useCallback(() => {
@@ -151,6 +154,28 @@ export function DMView() {
         e.preventDefault();
         keysHeld.current.add(key);
         return;
+      }
+
+      // Tool keybinds (only when not holding modifier keys)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        switch (key) {
+          case 'e': // p(e)n - draw tool
+            e.preventDefault();
+            setToolState(prev => ({ ...prev, activeTool: 'draw' }));
+            return;
+          case 'r': // lase(r)
+            e.preventDefault();
+            setToolState(prev => ({ ...prev, activeTool: 'laser' }));
+            return;
+          case 'f': // (f)og hide
+            e.preventDefault();
+            setToolState(prev => ({ ...prev, activeTool: 'fogHide' }));
+            return;
+          case 'c': // (c)lear - reveal fog
+            e.preventDefault();
+            setToolState(prev => ({ ...prev, activeTool: 'fogReveal' }));
+            return;
+        }
       }
 
       // Grid calibration mode controls (no shift required when active)
@@ -420,10 +445,6 @@ export function DMView() {
   }, []);
 
   // Tool handlers
-  const handleToolChange = (tool: Tool) => {
-    setToolState(prev => ({ ...prev, activeTool: tool }));
-  };
-
   const handleBrushSizeChange = (size: number) => {
     setToolState(prev => ({ ...prev, brushSize: size }));
   };
@@ -492,6 +513,7 @@ export function DMView() {
     setState(prev => ({ ...prev, drawings: [] }));
     forceUpdate(n => n + 1);
   };
+  handleClearDrawingsRef.current = handleClearDrawings;
 
   const handleResetFog = () => {
     if (state.map.imageWidth > 0) {
@@ -583,7 +605,6 @@ export function DMView() {
 
       <Toolbar
         toolState={toolState}
-        onToolChange={handleToolChange}
         onBrushSizeChange={handleBrushSizeChange}
         onDrawColorChange={handleDrawColorChange}
         onLaserColorChange={handleLaserColorChange}

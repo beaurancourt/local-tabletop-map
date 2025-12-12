@@ -1,8 +1,15 @@
-import { Tool, ToolState } from '../types';
+import { ToolState } from '../types';
+
+const TOOL_NAMES: Record<string, string> = {
+  pan: 'Pan',
+  fogReveal: 'Reveal Fog (C)',
+  fogHide: 'Hide Fog (F)',
+  draw: 'Draw (E)',
+  laser: 'Laser (R)',
+};
 
 interface ToolbarProps {
   toolState: ToolState;
-  onToolChange: (tool: Tool) => void;
   onBrushSizeChange: (size: number) => void;
   onDrawColorChange: (color: string) => void;
   onLaserColorChange: (color: string) => void;
@@ -15,7 +22,6 @@ interface ToolbarProps {
 
 export function Toolbar({
   toolState,
-  onToolChange,
   onBrushSizeChange,
   onDrawColorChange,
   onLaserColorChange,
@@ -34,43 +40,22 @@ export function Toolbar({
 
       <div className="toolbar-section">
         <span className="toolbar-label">Tool:</span>
-        <button
-          className={toolState.activeTool === 'fogReveal' ? 'active' : ''}
-          onClick={() => onToolChange('fogReveal')}
-        >
-          Reveal Fog
-        </button>
-        <button
-          className={toolState.activeTool === 'fogHide' ? 'active' : ''}
-          onClick={() => onToolChange('fogHide')}
-        >
-          Hide Fog
-        </button>
-        <button
-          className={toolState.activeTool === 'draw' ? 'active' : ''}
-          onClick={() => onToolChange('draw')}
-        >
-          Draw
-        </button>
-        <button
-          className={toolState.activeTool === 'laser' ? 'active' : ''}
-          onClick={() => onToolChange('laser')}
-        >
-          Laser
-        </button>
+        <span className="current-tool">{TOOL_NAMES[toolState.activeTool] || toolState.activeTool}</span>
       </div>
 
-      <div className="toolbar-section">
-        <span className="toolbar-label">Brush:</span>
-        <input
-          type="range"
-          min="1"
-          max="5"
-          value={toolState.brushSize}
-          onChange={(e) => onBrushSizeChange(parseInt(e.target.value))}
-        />
-        <span>{toolState.brushSize}</span>
-      </div>
+      {(toolState.activeTool === 'fogReveal' || toolState.activeTool === 'fogHide') && (
+        <div className="toolbar-section">
+          <span className="toolbar-label">Brush:</span>
+          <input
+            type="range"
+            min="1"
+            max="5"
+            value={toolState.brushSize}
+            onChange={(e) => onBrushSizeChange(parseInt(e.target.value))}
+          />
+          <span>{toolState.brushSize}</span>
+        </div>
+      )}
 
       {toolState.activeTool === 'draw' && (
         <div className="toolbar-section">
@@ -85,7 +70,7 @@ export function Toolbar({
 
       {toolState.activeTool === 'laser' && (
         <div className="toolbar-section">
-          <span className="toolbar-label">Laser Color:</span>
+          <span className="toolbar-label">Color:</span>
           <input
             type="color"
             value={toolState.laserColor}
