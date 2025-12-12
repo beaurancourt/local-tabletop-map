@@ -43,6 +43,9 @@ export function DMView() {
   const latestFogRef = useRef(state.fog);
   latestFogRef.current = state.fog;
 
+  // Track held keys for continuous panning with diagonal support
+  const keysHeld = useRef<Set<string>>(new Set());
+
   // Undo function
   const undo = useCallback(() => {
     const newState = historyManager.undo(state);
@@ -131,13 +134,28 @@ export function DMView() {
     return unlisten;
   }, []);
 
-  // Keyboard handler for Shift+WASD to move player viewport, Shift+IJKL to nudge grid, Shift+G for grid calibration
+  // Track shift key state for determining pan target
+  const shiftHeld = useRef(false);
+
+  // Keyboard handler for various shortcuts and tracking held keys for panning
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Track shift state
+      if (e.key === 'Shift') {
+        shiftHeld.current = true;
+      }
+
+      // Track WASD for continuous panning
+      const key = e.key.toLowerCase();
+      if (['w', 'a', 's', 'd'].includes(key)) {
+        e.preventDefault();
+        keysHeld.current.add(key);
+        return;
+      }
+
       // Grid calibration mode controls (no shift required when active)
       if (gridCalibration?.active) {
         if (e.key === '[') {
-          // Too big - need smaller grid
           e.preventDefault();
           const newHigh = state.map.gridSize - 1;
           const newSize = Math.floor((gridCalibration.low + newHigh) / 2);
@@ -153,7 +171,6 @@ export function DMView() {
           return;
         }
         if (e.key === ']') {
-          // Too small - need bigger grid
           e.preventDefault();
           const newLow = state.map.gridSize + 1;
           const newSize = Math.floor((newLow + gridCalibration.high) / 2);
@@ -169,13 +186,11 @@ export function DMView() {
           return;
         }
         if (e.key === 'Enter') {
-          // Perfect - exit calibration mode
           e.preventDefault();
           setGridCalibration(null);
           return;
         }
         if (e.key === 'Escape') {
-          // Cancel calibration mode
           e.preventDefault();
           setGridCalibration(null);
           return;
@@ -183,7 +198,6 @@ export function DMView() {
       }
 
       // Viewport size adjustment (no shift required) - only when not in calibration mode
-      // - decreases size (lower PPI = smaller), = increases size (higher PPI = bigger)
       if (!gridCalibration?.active) {
         if (e.key === '-') {
           e.preventDefault();
@@ -212,7 +226,7 @@ export function DMView() {
       if (!e.shiftKey) return;
 
       // Shift+R to reset viewport to saved calibration
-      if (e.key.toLowerCase() === 'r') {
+      if (key === 'r') {
         e.preventDefault();
         setState(prev => ({
           ...prev,
@@ -225,12 +239,11 @@ export function DMView() {
       }
 
       // Shift+G to start grid calibration
-      if (e.key.toLowerCase() === 'g') {
+      if (key === 'g') {
         e.preventDefault();
         if (gridCalibration?.active) {
           setGridCalibration(null);
         } else {
-          // Start binary search with reasonable bounds
           setGridCalibration({
             active: true,
             low: 10,
@@ -240,97 +253,107 @@ export function DMView() {
         return;
       }
 
-      const moveAmount = state.map.gridSize; // Move by 1 grid square
-
-      switch (e.key.toLowerCase()) {
-        // Player viewport movement (WASD)
-        case 'w':
-          e.preventDefault();
-          setState(prev => ({
-            ...prev,
-            playerViewOffset: {
-              ...prev.playerViewOffset,
-              y: prev.playerViewOffset.y - moveAmount,
-            },
-          }));
-          break;
-        case 's':
-          e.preventDefault();
-          setState(prev => ({
-            ...prev,
-            playerViewOffset: {
-              ...prev.playerViewOffset,
-              y: prev.playerViewOffset.y + moveAmount,
-            },
-          }));
-          break;
-        case 'a':
-          e.preventDefault();
-          setState(prev => ({
-            ...prev,
-            playerViewOffset: {
-              ...prev.playerViewOffset,
-              x: prev.playerViewOffset.x - moveAmount,
-            },
-          }));
-          break;
-        case 'd':
-          e.preventDefault();
-          setState(prev => ({
-            ...prev,
-            playerViewOffset: {
-              ...prev.playerViewOffset,
-              x: prev.playerViewOffset.x + moveAmount,
-            },
-          }));
-          break;
-        // Grid offset nudge (IJKL) - 1 pixel at a time
+      // Shift+IJKL for grid offset nudge (1 pixel at a time)
+      switch (key) {
         case 'i':
           e.preventDefault();
           setState(prev => ({
             ...prev,
-            map: {
-              ...prev.map,
-              gridOffsetY: prev.map.gridOffsetY - 1,
-            },
+            map: { ...prev.map, gridOffsetY: prev.map.gridOffsetY - 1 },
           }));
           break;
         case 'k':
           e.preventDefault();
           setState(prev => ({
             ...prev,
-            map: {
-              ...prev.map,
-              gridOffsetY: prev.map.gridOffsetY + 1,
-            },
+            map: { ...prev.map, gridOffsetY: prev.map.gridOffsetY + 1 },
           }));
           break;
         case 'j':
           e.preventDefault();
           setState(prev => ({
             ...prev,
-            map: {
-              ...prev.map,
-              gridOffsetX: prev.map.gridOffsetX - 1,
-            },
+            map: { ...prev.map, gridOffsetX: prev.map.gridOffsetX - 1 },
           }));
           break;
         case 'l':
           e.preventDefault();
           setState(prev => ({
             ...prev,
-            map: {
-              ...prev.map,
-              gridOffsetX: prev.map.gridOffsetX + 1,
-            },
+            map: { ...prev.map, gridOffsetX: prev.map.gridOffsetX + 1 },
           }));
           break;
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        shiftHeld.current = false;
+      }
+      const key = e.key.toLowerCase();
+      if (['w', 'a', 's', 'd'].includes(key)) {
+        keysHeld.current.delete(key);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, [state.map.gridSize, gridCalibration]);
+
+  // Continuous panning with WASD (supports diagonal movement)
+  // WASD = pan DM view, Shift+WASD = move player viewport
+  useEffect(() => {
+    const panSpeed = 10; // pixels per frame
+    const playerMoveSpeed = state.map.gridSize / 4; // map units per frame
+
+    const interval = setInterval(() => {
+      const keys = keysHeld.current;
+      if (keys.size === 0) return;
+
+      let dx = 0;
+      let dy = 0;
+      if (keys.has('w')) dy -= 1;
+      if (keys.has('s')) dy += 1;
+      if (keys.has('a')) dx -= 1;
+      if (keys.has('d')) dx += 1;
+
+      if (dx === 0 && dy === 0) return;
+
+      // Normalize diagonal movement
+      if (dx !== 0 && dy !== 0) {
+        const diag = Math.SQRT1_2;
+        dx *= diag;
+        dy *= diag;
+      }
+
+      if (shiftHeld.current) {
+        // Move player viewport
+        setState(prev => ({
+          ...prev,
+          playerViewOffset: {
+            x: prev.playerViewOffset.x + dx * playerMoveSpeed,
+            y: prev.playerViewOffset.y + dy * playerMoveSpeed,
+          },
+        }));
+      } else {
+        // Pan DM view
+        setState(prev => ({
+          ...prev,
+          view: {
+            ...prev.view,
+            offsetX: prev.view.offsetX - dx * panSpeed,
+            offsetY: prev.view.offsetY - dy * panSpeed,
+          },
+        }));
+      }
+    }, 16); // ~60fps
+
+    return () => clearInterval(interval);
+  }, [state.map.gridSize]);
 
   // Load map image
   const handleLoadMap = useCallback(async () => {

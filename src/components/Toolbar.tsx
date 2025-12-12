@@ -33,12 +33,6 @@ export function Toolbar({
       <div className="toolbar-section">
         <span className="toolbar-label">Tool:</span>
         <button
-          className={toolState.activeTool === 'pan' ? 'active' : ''}
-          onClick={() => onToolChange('pan')}
-        >
-          Pan
-        </button>
-        <button
           className={toolState.activeTool === 'fogReveal' ? 'active' : ''}
           onClick={() => onToolChange('fogReveal')}
         >
