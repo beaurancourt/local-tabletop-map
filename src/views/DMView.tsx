@@ -30,6 +30,7 @@ export function DMView() {
     active: boolean;
     low: number;
     high: number;
+    originalGridSize: number; // To restore on cancel
   } | null>(null);
 
   // History manager for undo/redo (command pattern)
@@ -182,41 +183,42 @@ export function DMView() {
       if (gridCalibration?.active) {
         if (e.key === '[') {
           e.preventDefault();
-          const newHigh = state.map.gridSize - 1;
-          const newSize = Math.floor((gridCalibration.low + newHigh) / 2);
-          if (newHigh >= gridCalibration.low) {
+          const newHigh = state.map.gridSize;
+          const newSize = (gridCalibration.low + newHigh) / 2;
+          if (newHigh > gridCalibration.low + 0.001) {
             setGridCalibration({ ...gridCalibration, high: newHigh });
-            setState(prev => {
-              const fog = prev.map.imageWidth > 0
-                ? initializeFog(prev.map.imageWidth, prev.map.imageHeight, newSize)
-                : prev.fog;
-              return { ...prev, map: { ...prev.map, gridSize: newSize }, fog };
-            });
+            // Only update gridSize for visual preview, don't reinitialize fog
+            setState(prev => ({ ...prev, map: { ...prev.map, gridSize: newSize } }));
           }
           return;
         }
         if (e.key === ']') {
           e.preventDefault();
-          const newLow = state.map.gridSize + 1;
-          const newSize = Math.floor((newLow + gridCalibration.high) / 2);
-          if (newLow <= gridCalibration.high) {
+          const newLow = state.map.gridSize;
+          const newSize = (newLow + gridCalibration.high) / 2;
+          if (newLow < gridCalibration.high - 0.001) {
             setGridCalibration({ ...gridCalibration, low: newLow });
-            setState(prev => {
-              const fog = prev.map.imageWidth > 0
-                ? initializeFog(prev.map.imageWidth, prev.map.imageHeight, newSize)
-                : prev.fog;
-              return { ...prev, map: { ...prev.map, gridSize: newSize }, fog };
-            });
+            // Only update gridSize for visual preview, don't reinitialize fog
+            setState(prev => ({ ...prev, map: { ...prev.map, gridSize: newSize } }));
           }
           return;
         }
         if (e.key === 'Enter') {
           e.preventDefault();
+          // Confirm: reinitialize fog with the final grid size
+          setState(prev => {
+            const fog = prev.map.imageWidth > 0
+              ? initializeFog(prev.map.imageWidth, prev.map.imageHeight, prev.map.gridSize)
+              : prev.fog;
+            return { ...prev, fog };
+          });
           setGridCalibration(null);
           return;
         }
         if (e.key === 'Escape') {
           e.preventDefault();
+          // Cancel: restore original grid size (fog stays as-is since we didn't change it)
+          setState(prev => ({ ...prev, map: { ...prev.map, gridSize: gridCalibration.originalGridSize } }));
           setGridCalibration(null);
           return;
         }
@@ -273,6 +275,7 @@ export function DMView() {
             active: true,
             low: 10,
             high: 500,
+            originalGridSize: state.map.gridSize,
           });
         }
         return;
@@ -598,7 +601,7 @@ export function DMView() {
       {gridCalibration?.active && (
         <div className="calibration-indicator">
           <strong>Grid Calibration Mode</strong>
-          <div>Current: {state.map.gridSize}px | Range: [{gridCalibration.low}, {gridCalibration.high}]</div>
+          <div>Current: {state.map.gridSize.toFixed(3)}px | Range: [{gridCalibration.low.toFixed(3)}, {gridCalibration.high.toFixed(3)}]</div>
           <div>[ = too big | ] = too small | Enter = perfect | Esc = cancel</div>
         </div>
       )}
@@ -613,6 +616,8 @@ export function DMView() {
         onClearDrawings={handleClearDrawings}
         onResetFog={handleResetFog}
         onClearFog={handleClearFog}
+        showSettings={showSettings}
+        onToggleSettings={() => setShowSettings(!showSettings)}
       />
 
       <div className="main-content">
@@ -630,13 +635,6 @@ export function DMView() {
             playerViewport={playerViewport}
           />
         </div>
-
-        <button
-          className="settings-toggle"
-          onClick={() => setShowSettings(!showSettings)}
-        >
-          {showSettings ? '>' : '<'} Settings
-        </button>
 
         {showSettings && (
           <div className="settings-sidebar">

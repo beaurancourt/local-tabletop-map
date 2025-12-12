@@ -18,6 +18,8 @@ interface ToolbarProps {
   onClearDrawings: () => void;
   onResetFog: () => void;
   onClearFog: () => void;
+  showSettings: boolean;
+  onToggleSettings: () => void;
 }
 
 export function Toolbar({
@@ -30,6 +32,8 @@ export function Toolbar({
   onClearDrawings,
   onResetFog,
   onClearFog,
+  showSettings,
+  onToggleSettings,
 }: ToolbarProps) {
   return (
     <div className="toolbar">
@@ -83,6 +87,14 @@ export function Toolbar({
         <button onClick={onClearDrawings}>Clear Drawings</button>
         <button onClick={onResetFog}>Reset Fog</button>
         <button onClick={onClearFog}>Clear All Fog</button>
+      </div>
+
+      <div className="toolbar-spacer" />
+
+      <div className="toolbar-section">
+        <button onClick={onToggleSettings}>
+          {showSettings ? 'Hide' : 'Show'} Settings
+        </button>
       </div>
     </div>
   );
