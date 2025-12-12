@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Stage, Layer, Image, Line, Rect, Group } from 'react-konva';
 import Konva from 'konva';
 import { AppState, ToolState, Drawing, DrawingPoint, PlayerViewport } from '../types';
@@ -38,6 +38,38 @@ export function MapCanvas({
   // Track latest state for operation completion (avoids stale closure issues)
   const latestStateRef = useRef(state);
   latestStateRef.current = state;
+
+  // Render fog to a canvas for performance (instead of thousands of Rect elements)
+  const fogCanvas = useMemo(() => {
+    if (state.fog.rows === 0 || state.fog.cols === 0) return null;
+
+    const gridSize = state.map.gridSize || 50;
+    const canvas = document.createElement('canvas');
+    canvas.width = state.map.imageWidth;
+    canvas.height = state.map.imageHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw fog cells
+    ctx.fillStyle = '#000000';
+    for (let row = 0; row < state.fog.rows; row++) {
+      for (let col = 0; col < state.fog.cols; col++) {
+        if (state.fog.cells[row]?.[col]) {
+          ctx.fillRect(
+            state.map.gridOffsetX + col * gridSize,
+            state.map.gridOffsetY + row * gridSize,
+            gridSize,
+            gridSize
+          );
+        }
+      }
+    }
+
+    return canvas;
+  }, [state.fog, state.map.gridSize, state.map.gridOffsetX, state.map.gridOffsetY, state.map.imageWidth, state.map.imageHeight]);
 
   // Load map image
   useEffect(() => {
@@ -301,25 +333,12 @@ export function MapCanvas({
           />
         )}
 
-        {/* Fog of War */}
-        {state.fog.cells.map((row, rowIndex) =>
-          row.map((isFogged, colIndex) => {
-            // In player view, show fog. In DM view, show semi-transparent fog
-            if (!isFogged && isPlayerView) return null;
-            if (!isFogged && !isPlayerView) return null;
-
-            return (
-              <Rect
-                key={`fog-${rowIndex}-${colIndex}`}
-                x={state.map.gridOffsetX + colIndex * safeGridSize}
-                y={state.map.gridOffsetY + rowIndex * safeGridSize}
-                width={safeGridSize}
-                height={safeGridSize}
-                fill={isPlayerView ? '#000000' : '#000000'}
-                opacity={isPlayerView ? 1 : 0.5}
-              />
-            );
-          })
+        {/* Fog of War (rendered as single canvas for performance) */}
+        {fogCanvas && (
+          <Image
+            image={fogCanvas}
+            opacity={isPlayerView ? 1 : 0.5}
+          />
         )}
 
         {/* Player Viewport Indicator (DM view only) */}
