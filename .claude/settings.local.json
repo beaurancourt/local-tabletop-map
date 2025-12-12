@@ -9,7 +9,9 @@
       "Bash(pkill:*)",
       "Bash(PATH=\"$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin\" npm run tauri dev)",
       "Bash(PATH=$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin npm run tauri:*)",
-      "Bash(cargo --version:*)"
+      "Bash(cargo --version:*)",
+      "Bash(npm run tauri:*)",
+      "Bash(export PATH=$HOME/.cargo/bin:$PATH)"
     ],
     "deny": [],
     "ask": []

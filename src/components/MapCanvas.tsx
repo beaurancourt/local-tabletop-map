@@ -9,6 +9,9 @@ interface MapCanvasProps {
   toolState?: ToolState;
   isPlayerView?: boolean;
   onStateChange?: (state: AppState) => void;
+  onFogOperationStart?: () => void; // Called when fog operation starts
+  onFogOperationEnd?: () => void; // Called when fog operation ends
+  onDrawingAdded?: (drawing: Drawing) => void; // Called when a drawing is completed
   width: number;
   height: number;
   playerViewport?: PlayerViewport | null;
@@ -19,6 +22,9 @@ export function MapCanvas({
   toolState,
   isPlayerView = false,
   onStateChange,
+  onFogOperationStart,
+  onFogOperationEnd,
+  onDrawingAdded,
   width,
   height,
   playerViewport,
@@ -26,7 +32,12 @@ export function MapCanvas({
   const stageRef = useRef<Konva.Stage>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isFogging, setIsFogging] = useState(false);
   const [currentDrawing, setCurrentDrawing] = useState<DrawingPoint[]>([]);
+
+  // Track latest state for operation completion (avoids stale closure issues)
+  const latestStateRef = useRef(state);
+  latestStateRef.current = state;
 
   // Load map image
   useEffect(() => {
@@ -99,6 +110,8 @@ export function MapCanvas({
     if (!pos) return;
 
     if (toolState.activeTool === 'fogReveal' || toolState.activeTool === 'fogHide') {
+      setIsFogging(true);
+      onFogOperationStart?.();
       const reveal = toolState.activeTool === 'fogReveal';
       const newFog = modifyFog(state.fog, pos.gridX, pos.gridY, toolState.brushSize, reveal);
       onStateChange({ ...state, fog: newFog });
@@ -108,7 +121,7 @@ export function MapCanvas({
     } else if (toolState.activeTool === 'pan') {
       // Pan is handled by drag
     }
-  }, [isPlayerView, onStateChange, toolState, state, getGridPosition]);
+  }, [isPlayerView, onStateChange, onFogOperationStart, toolState, state, getGridPosition]);
 
   // Handle mouse move
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -141,14 +154,20 @@ export function MapCanvas({
         color: toolState.drawColor,
         strokeWidth: toolState.drawStrokeWidth,
       };
-      onStateChange({
-        ...state,
-        drawings: [...state.drawings, newDrawing],
-      });
+      const newState = {
+        ...latestStateRef.current,
+        drawings: [...latestStateRef.current.drawings, newDrawing],
+      };
+      onStateChange(newState);
+      onDrawingAdded?.(newDrawing);
+    }
+    if (isFogging) {
+      onFogOperationEnd?.();
     }
     setIsDrawing(false);
+    setIsFogging(false);
     setCurrentDrawing([]);
-  }, [isDrawing, currentDrawing, onStateChange, toolState, state]);
+  }, [isDrawing, isFogging, currentDrawing, onStateChange, onFogOperationEnd, onDrawingAdded, toolState]);
 
   // Handle drag for panning
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {

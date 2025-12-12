@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
@@ -6,9 +6,17 @@ import { MapCanvas } from '../components/MapCanvas';
 import { Toolbar } from '../components/Toolbar';
 import { GridSettings } from '../components/GridSettings';
 import { CalibrationSettings } from '../components/CalibrationSettings';
-import { AppState, Tool, ToolState, PlayerViewport } from '../types';
+import { AppState, Tool, ToolState, PlayerViewport, FogState, Drawing } from '../types';
 import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync } from '../store';
 import { saveMapState, loadMapState, applySavedState } from '../persistence';
+import {
+  HistoryManager,
+  createFogChangeOperation,
+  createDrawingAddOperation,
+  createDrawingsClearOperation,
+  createFogResetOperation,
+  createFogClearOperation,
+} from '../history';
 
 export function DMView() {
   const [state, setState] = useState<AppState>(createDefaultState);
@@ -24,51 +32,55 @@ export function DMView() {
     high: number;
   } | null>(null);
 
-  // Undo/redo history (max 100 states)
-  const [stateHistory, setStateHistory] = useState<AppState[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const isUndoRedoAction = useRef(false);
+  // History manager for undo/redo (command pattern)
+  const historyManager = useMemo(() => new HistoryManager(), []);
+  const [, forceUpdate] = useState(0); // To trigger re-render after undo/redo
 
-  // Push current state to history (call this after meaningful changes)
-  const pushToHistory = useCallback((newState: AppState) => {
-    if (isUndoRedoAction.current) {
-      isUndoRedoAction.current = false;
-      return;
-    }
+  // Track fog state before operation starts (for computing diff)
+  const fogBeforeOperation = useRef<FogState | null>(null);
 
-    setStateHistory(prev => {
-      // If we're not at the end, truncate future states
-      const truncated = prev.slice(0, historyIndex + 1);
-      const newHistory = [...truncated, newState];
-      // Keep only last 100 states
-      if (newHistory.length > 100) {
-        newHistory.shift();
-        return newHistory;
-      }
-      return newHistory;
-    });
-    setHistoryIndex(prev => Math.min(prev + 1, 99));
-  }, [historyIndex]);
+  // Track latest fog state to avoid stale closures
+  const latestFogRef = useRef(state.fog);
+  latestFogRef.current = state.fog;
 
   // Undo function
   const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      isUndoRedoAction.current = true;
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      setState(stateHistory[newIndex]);
+    const newState = historyManager.undo(state);
+    if (newState) {
+      setState(newState);
+      forceUpdate(n => n + 1);
     }
-  }, [historyIndex, stateHistory]);
+  }, [state, historyManager]);
 
   // Redo function
   const redo = useCallback(() => {
-    if (historyIndex < stateHistory.length - 1) {
-      isUndoRedoAction.current = true;
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      setState(stateHistory[newIndex]);
+    const newState = historyManager.redo(state);
+    if (newState) {
+      setState(newState);
+      forceUpdate(n => n + 1);
     }
-  }, [historyIndex, stateHistory]);
+  }, [state, historyManager]);
+
+  // Keyboard handler for undo/redo
+  useEffect(() => {
+    const handleUndoRedo = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleUndoRedo);
+    return () => window.removeEventListener('keydown', handleUndoRedo);
+  }, [undo, redo]);
 
   // Handle window resize
   useEffect(() => {
@@ -299,16 +311,17 @@ export function DMView() {
         // Get image dimensions
         const img = new Image();
         img.onload = () => {
+          let newState: AppState;
           if (savedState) {
             // Restore saved state
-            setState(prev => applySavedState(prev, savedState, url));
+            newState = applySavedState(state, savedState, url);
           } else {
             // Initialize fresh state
             const fog = initializeFog(img.width, img.height, state.map.gridSize);
-            setState(prev => ({
-              ...prev,
+            newState = {
+              ...state,
               map: {
-                ...prev.map,
+                ...state.map,
                 imageUrl: url,
                 filePath: selected,
                 imageWidth: img.width,
@@ -320,15 +333,18 @@ export function DMView() {
               drawings: [],
               view: { scale: 1, offsetX: 0, offsetY: 0 },
               playerViewOffset: { x: 0, y: 0 },
-            }));
+            };
           }
+          setState(newState);
+          // Clear history when loading a new map
+          historyManager.clear();
         };
         img.src = url;
       }
     } catch (err) {
       console.error('Failed to load map:', err);
     }
-  }, [state.map.gridSize]);
+  }, [state]);
 
   // Open player window
   const handleOpenPlayerWindow = useCallback(async () => {
@@ -354,21 +370,74 @@ export function DMView() {
 
   // State handlers
   const handleStateChange = (newState: AppState) => {
+    // Update fog ref immediately (before async React render) for undo/redo tracking
+    latestFogRef.current = newState.fog;
     setState(newState);
   };
 
+  // Fog operation callbacks
+  const handleFogOperationStart = useCallback(() => {
+    // Capture fog state before operation for computing diff
+    fogBeforeOperation.current = JSON.parse(JSON.stringify(state.fog));
+  }, [state.fog]);
+
+  const handleFogOperationEnd = useCallback(() => {
+    if (!fogBeforeOperation.current) return;
+
+    // Compute which cells changed (use ref to get latest fog state)
+    const changes: Array<{ row: number; col: number; wasRevealed: boolean }> = [];
+    const before = fogBeforeOperation.current;
+    const after = latestFogRef.current;
+
+    for (let row = 0; row < Math.min(before.rows, after.rows); row++) {
+      for (let col = 0; col < Math.min(before.cols, after.cols); col++) {
+        if (before.cells[row][col] !== after.cells[row][col]) {
+          changes.push({
+            row,
+            col,
+            wasRevealed: !before.cells[row][col], // wasRevealed = was NOT fogged
+          });
+        }
+      }
+    }
+
+    if (changes.length > 0) {
+      const operation = createFogChangeOperation(changes);
+      historyManager.push(operation);
+      forceUpdate(n => n + 1);
+    }
+
+    fogBeforeOperation.current = null;
+  }, [historyManager]);
+
+  // Drawing added callback
+  const handleDrawingAdded = useCallback((drawing: Drawing) => {
+    const operation = createDrawingAddOperation(drawing);
+    historyManager.push(operation);
+    forceUpdate(n => n + 1);
+  }, [historyManager]);
+
   const handleClearDrawings = () => {
+    if (state.drawings.length === 0) return;
+    const operation = createDrawingsClearOperation([...state.drawings]);
+    historyManager.push(operation);
     setState(prev => ({ ...prev, drawings: [] }));
+    forceUpdate(n => n + 1);
   };
 
   const handleResetFog = () => {
     if (state.map.imageWidth > 0) {
-      const fog = initializeFog(state.map.imageWidth, state.map.imageHeight, state.map.gridSize);
-      setState(prev => ({ ...prev, fog }));
+      const newFog = initializeFog(state.map.imageWidth, state.map.imageHeight, state.map.gridSize);
+      const operation = createFogResetOperation(state.fog, newFog);
+      historyManager.push(operation);
+      setState(prev => ({ ...prev, fog: newFog }));
+      forceUpdate(n => n + 1);
     }
   };
 
   const handleClearFog = () => {
+    const operation = createFogClearOperation(state.fog);
+    historyManager.push(operation);
     setState(prev => ({
       ...prev,
       fog: {
@@ -376,6 +445,7 @@ export function DMView() {
         cells: prev.fog.cells.map(row => row.map(() => false)),
       },
     }));
+    forceUpdate(n => n + 1);
   };
 
   // Grid settings handlers
@@ -442,6 +512,9 @@ export function DMView() {
             toolState={toolState}
             isPlayerView={false}
             onStateChange={handleStateChange}
+            onFogOperationStart={handleFogOperationStart}
+            onFogOperationEnd={handleFogOperationEnd}
+            onDrawingAdded={handleDrawingAdded}
             width={showSettings ? windowSize.width - 300 : windowSize.width}
             height={windowSize.height}
             playerViewport={playerViewport}
