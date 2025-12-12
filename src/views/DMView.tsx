@@ -17,6 +17,59 @@ export function DMView() {
   const [showSettings, setShowSettings] = useState(false);
   const [playerViewport, setPlayerViewport] = useState<PlayerViewport | null>(null);
 
+  // Grid calibration binary search state
+  const [gridCalibration, setGridCalibration] = useState<{
+    active: boolean;
+    low: number;
+    high: number;
+  } | null>(null);
+
+  // Undo/redo history (max 100 states)
+  const [stateHistory, setStateHistory] = useState<AppState[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const isUndoRedoAction = useRef(false);
+
+  // Push current state to history (call this after meaningful changes)
+  const pushToHistory = useCallback((newState: AppState) => {
+    if (isUndoRedoAction.current) {
+      isUndoRedoAction.current = false;
+      return;
+    }
+
+    setStateHistory(prev => {
+      // If we're not at the end, truncate future states
+      const truncated = prev.slice(0, historyIndex + 1);
+      const newHistory = [...truncated, newState];
+      // Keep only last 100 states
+      if (newHistory.length > 100) {
+        newHistory.shift();
+        return newHistory;
+      }
+      return newHistory;
+    });
+    setHistoryIndex(prev => Math.min(prev + 1, 99));
+  }, [historyIndex]);
+
+  // Undo function
+  const undo = useCallback(() => {
+    if (historyIndex > 0) {
+      isUndoRedoAction.current = true;
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setState(stateHistory[newIndex]);
+    }
+  }, [historyIndex, stateHistory]);
+
+  // Redo function
+  const redo = useCallback(() => {
+    if (historyIndex < stateHistory.length - 1) {
+      isUndoRedoAction.current = true;
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setState(stateHistory[newIndex]);
+    }
+  }, [historyIndex, stateHistory]);
+
   // Handle window resize
   useEffect(() => {
     const updateSize = () => {
@@ -66,10 +119,74 @@ export function DMView() {
     return unlisten;
   }, []);
 
-  // Keyboard handler for Shift+WASD to move player viewport, Shift+IJKL to nudge grid
+  // Keyboard handler for Shift+WASD to move player viewport, Shift+IJKL to nudge grid, Shift+G for grid calibration
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Grid calibration mode controls (no shift required when active)
+      if (gridCalibration?.active) {
+        if (e.key === '[') {
+          // Too big - need smaller grid
+          e.preventDefault();
+          const newHigh = state.map.gridSize - 1;
+          const newSize = Math.floor((gridCalibration.low + newHigh) / 2);
+          if (newHigh >= gridCalibration.low) {
+            setGridCalibration({ ...gridCalibration, high: newHigh });
+            setState(prev => {
+              const fog = prev.map.imageWidth > 0
+                ? initializeFog(prev.map.imageWidth, prev.map.imageHeight, newSize)
+                : prev.fog;
+              return { ...prev, map: { ...prev.map, gridSize: newSize }, fog };
+            });
+          }
+          return;
+        }
+        if (e.key === ']') {
+          // Too small - need bigger grid
+          e.preventDefault();
+          const newLow = state.map.gridSize + 1;
+          const newSize = Math.floor((newLow + gridCalibration.high) / 2);
+          if (newLow <= gridCalibration.high) {
+            setGridCalibration({ ...gridCalibration, low: newLow });
+            setState(prev => {
+              const fog = prev.map.imageWidth > 0
+                ? initializeFog(prev.map.imageWidth, prev.map.imageHeight, newSize)
+                : prev.fog;
+              return { ...prev, map: { ...prev.map, gridSize: newSize }, fog };
+            });
+          }
+          return;
+        }
+        if (e.key === 'Enter') {
+          // Perfect - exit calibration mode
+          e.preventDefault();
+          setGridCalibration(null);
+          return;
+        }
+        if (e.key === 'Escape') {
+          // Cancel calibration mode
+          e.preventDefault();
+          setGridCalibration(null);
+          return;
+        }
+      }
+
       if (!e.shiftKey) return;
+
+      // Shift+G to start grid calibration
+      if (e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (gridCalibration?.active) {
+          setGridCalibration(null);
+        } else {
+          // Start binary search with reasonable bounds
+          setGridCalibration({
+            active: true,
+            low: 10,
+            high: 500,
+          });
+        }
+        return;
+      }
 
       const moveAmount = state.map.gridSize; // Move by 1 grid square
 
@@ -161,7 +278,7 @@ export function DMView() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.map.gridSize]);
+  }, [state.map.gridSize, gridCalibration]);
 
   // Load map image
   const handleLoadMap = useCallback(async () => {
@@ -297,6 +414,15 @@ export function DMView() {
 
   return (
     <div className="dm-view">
+      {/* Grid Calibration Mode Indicator */}
+      {gridCalibration?.active && (
+        <div className="calibration-indicator">
+          <strong>Grid Calibration Mode</strong>
+          <div>Current: {state.map.gridSize}px | Range: [{gridCalibration.low}, {gridCalibration.high}]</div>
+          <div>[ = too big | ] = too small | Enter = perfect | Esc = cancel</div>
+        </div>
+      )}
+
       <Toolbar
         toolState={toolState}
         onToolChange={handleToolChange}

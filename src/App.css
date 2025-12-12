@@ -210,3 +210,30 @@ html, body, #root {
   justify-content: center;
   color: #666;
 }
+
+/* Grid Calibration Indicator */
+.calibration-indicator {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(90, 90, 200, 0.95);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  z-index: 1000;
+  text-align: center;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.calibration-indicator strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.calibration-indicator div {
+  margin-top: 4px;
+  opacity: 0.9;
+}
