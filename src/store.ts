@@ -24,6 +24,7 @@ export const createDefaultState = (): AppState => ({
     rows: 0,
   },
   drawings: [],
+  laserPoints: [],
   view: {
     scale: 1,
     offsetX: 0,
@@ -44,6 +45,7 @@ export const createDefaultToolState = (): ToolState => ({
   brushSize: 1,
   drawColor: '#ff0000',
   drawStrokeWidth: 3,
+  laserColor: '#00ff00', // Lime green
 });
 
 // Initialize fog grid based on map dimensions

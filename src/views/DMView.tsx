@@ -394,6 +394,7 @@ export function DMView() {
               },
               fog,
               drawings: [],
+              laserPoints: [],
               view: { scale: 1, offsetX: 0, offsetY: 0 },
               playerViewOffset: { x: 0, y: 0 },
             };
@@ -429,6 +430,10 @@ export function DMView() {
 
   const handleDrawColorChange = (color: string) => {
     setToolState(prev => ({ ...prev, drawColor: color }));
+  };
+
+  const handleLaserColorChange = (color: string) => {
+    setToolState(prev => ({ ...prev, laserColor: color }));
   };
 
   // State handlers
@@ -581,6 +586,7 @@ export function DMView() {
         onToolChange={handleToolChange}
         onBrushSizeChange={handleBrushSizeChange}
         onDrawColorChange={handleDrawColorChange}
+        onLaserColorChange={handleLaserColorChange}
         onLoadMap={handleLoadMap}
         onOpenPlayerWindow={handleOpenPlayerWindow}
         onClearDrawings={handleClearDrawings}

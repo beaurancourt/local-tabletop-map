@@ -93,6 +93,7 @@ export function applySavedState(
     },
     fog: savedState.fog,
     drawings: savedState.drawings,
+    laserPoints: [], // Laser is temporary, never persisted
     view: savedState.view,
     playerViewOffset: savedState.playerViewOffset,
     calibration: {

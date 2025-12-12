@@ -118,6 +118,10 @@ export function MapCanvas({
     } else if (toolState.activeTool === 'draw') {
       setIsDrawing(true);
       setCurrentDrawing([{ x: pos.x, y: pos.y }]);
+    } else if (toolState.activeTool === 'laser') {
+      setIsDrawing(true);
+      // Update laserPoints in state for sync to player view
+      onStateChange({ ...state, laserPoints: [{ x: pos.x, y: pos.y }] });
     } else if (toolState.activeTool === 'pan') {
       // Pan is handled by drag
     }
@@ -142,24 +146,35 @@ export function MapCanvas({
       onStateChange({ ...state, fog: newFog });
     } else if (toolState.activeTool === 'draw' && isDrawing) {
       setCurrentDrawing(prev => [...prev, { x: pos.x, y: pos.y }]);
+    } else if (toolState.activeTool === 'laser' && isDrawing) {
+      // Update laserPoints in state for sync to player view
+      onStateChange({
+        ...latestStateRef.current,
+        laserPoints: [...latestStateRef.current.laserPoints, { x: pos.x, y: pos.y }],
+      });
     }
   }, [isPlayerView, onStateChange, toolState, state, getGridPosition, isDrawing]);
 
   // Handle mouse up
   const handleMouseUp = useCallback(() => {
-    if (isDrawing && currentDrawing.length > 1 && onStateChange && toolState) {
-      const newDrawing: Drawing = {
-        id: Date.now().toString(),
-        points: currentDrawing,
-        color: toolState.drawColor,
-        strokeWidth: toolState.drawStrokeWidth,
-      };
-      const newState = {
-        ...latestStateRef.current,
-        drawings: [...latestStateRef.current.drawings, newDrawing],
-      };
-      onStateChange(newState);
-      onDrawingAdded?.(newDrawing);
+    if (isDrawing && toolState) {
+      if (toolState.activeTool === 'draw' && currentDrawing.length > 1 && onStateChange) {
+        const newDrawing: Drawing = {
+          id: Date.now().toString(),
+          points: currentDrawing,
+          color: toolState.drawColor,
+          strokeWidth: toolState.drawStrokeWidth,
+        };
+        const newState = {
+          ...latestStateRef.current,
+          drawings: [...latestStateRef.current.drawings, newDrawing],
+        };
+        onStateChange(newState);
+        onDrawingAdded?.(newDrawing);
+      } else if (toolState.activeTool === 'laser' && onStateChange) {
+        // Clear laser on release (it's temporary)
+        onStateChange({ ...latestStateRef.current, laserPoints: [] });
+      }
     }
     if (isFogging) {
       onFogOperationEnd?.();
@@ -270,6 +285,17 @@ export function MapCanvas({
             points={currentDrawing.flatMap(p => [p.x, p.y])}
             stroke={toolState.drawColor}
             strokeWidth={toolState.drawStrokeWidth / effectiveScale}
+            lineCap="round"
+            lineJoin="round"
+          />
+        )}
+
+        {/* Laser pointer (temporary, synced from DM) */}
+        {state.laserPoints.length > 1 && (
+          <Line
+            points={state.laserPoints.flatMap(p => [p.x, p.y])}
+            stroke={toolState?.laserColor || '#00ff00'}
+            strokeWidth={(toolState?.drawStrokeWidth || 3) / effectiveScale}
             lineCap="round"
             lineJoin="round"
           />

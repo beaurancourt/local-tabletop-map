@@ -5,6 +5,7 @@ interface ToolbarProps {
   onToolChange: (tool: Tool) => void;
   onBrushSizeChange: (size: number) => void;
   onDrawColorChange: (color: string) => void;
+  onLaserColorChange: (color: string) => void;
   onLoadMap: () => void;
   onOpenPlayerWindow: () => void;
   onClearDrawings: () => void;
@@ -17,6 +18,7 @@ export function Toolbar({
   onToolChange,
   onBrushSizeChange,
   onDrawColorChange,
+  onLaserColorChange,
   onLoadMap,
   onOpenPlayerWindow,
   onClearDrawings,
@@ -50,6 +52,12 @@ export function Toolbar({
         >
           Draw
         </button>
+        <button
+          className={toolState.activeTool === 'laser' ? 'active' : ''}
+          onClick={() => onToolChange('laser')}
+        >
+          Laser
+        </button>
       </div>
 
       <div className="toolbar-section">
@@ -71,6 +79,17 @@ export function Toolbar({
             type="color"
             value={toolState.drawColor}
             onChange={(e) => onDrawColorChange(e.target.value)}
+          />
+        </div>
+      )}
+
+      {toolState.activeTool === 'laser' && (
+        <div className="toolbar-section">
+          <span className="toolbar-label">Laser Color:</span>
+          <input
+            type="color"
+            value={toolState.laserColor}
+            onChange={(e) => onLaserColorChange(e.target.value)}
           />
         </div>
       )}

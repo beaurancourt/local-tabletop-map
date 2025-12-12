@@ -65,6 +65,7 @@ export interface AppState {
   map: MapState;
   fog: FogState;
   drawings: Drawing[];
+  laserPoints: DrawingPoint[]; // Temporary laser pointer (synced to player view, cleared on release)
   view: ViewState;
   playerViewOffset: PlayerViewOffset;
   calibration: CalibrationState;
@@ -89,11 +90,12 @@ export interface SavedMapState {
   savedAt: string; // ISO timestamp
 }
 
-export type Tool = 'pan' | 'fogReveal' | 'fogHide' | 'draw';
+export type Tool = 'pan' | 'fogReveal' | 'fogHide' | 'draw' | 'laser';
 
 export interface ToolState {
   activeTool: Tool;
   brushSize: number; // in grid squares
   drawColor: string;
   drawStrokeWidth: number;
+  laserColor: string;
 }
