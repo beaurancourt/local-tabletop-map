@@ -39,36 +39,83 @@ export function MapCanvas({
   const latestStateRef = useRef(state);
   latestStateRef.current = state;
 
-  // Render fog to a canvas for performance (instead of thousands of Rect elements)
+  // Persistent fog canvas for incremental updates
+  const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fogCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const lastFogStateRef = useRef<{ cells: boolean[][], gridSize: number, offsetX: number, offsetY: number } | null>(null);
+
+  // Update fog canvas incrementally
   const fogCanvas = useMemo(() => {
     if (state.fog.rows === 0 || state.fog.cols === 0) return null;
 
     const gridSize = state.map.gridSize || 50;
-    const canvas = document.createElement('canvas');
-    canvas.width = state.map.imageWidth;
-    canvas.height = state.map.imageHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+    const needsFullRedraw = !fogCanvasRef.current ||
+      fogCanvasRef.current.width !== state.map.imageWidth ||
+      fogCanvasRef.current.height !== state.map.imageHeight ||
+      !lastFogStateRef.current ||
+      lastFogStateRef.current.gridSize !== gridSize ||
+      lastFogStateRef.current.offsetX !== state.map.gridOffsetX ||
+      lastFogStateRef.current.offsetY !== state.map.gridOffsetY ||
+      lastFogStateRef.current.cells.length !== state.fog.rows ||
+      (lastFogStateRef.current.cells[0]?.length || 0) !== state.fog.cols;
 
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (needsFullRedraw) {
+      // Full redraw needed
+      const canvas = document.createElement('canvas');
+      canvas.width = state.map.imageWidth;
+      canvas.height = state.map.imageHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
 
-    // Draw fog cells
-    ctx.fillStyle = '#000000';
-    for (let row = 0; row < state.fog.rows; row++) {
-      for (let col = 0; col < state.fog.cols; col++) {
-        if (state.fog.cells[row]?.[col]) {
-          ctx.fillRect(
-            state.map.gridOffsetX + col * gridSize,
-            state.map.gridOffsetY + row * gridSize,
-            gridSize,
-            gridSize
-          );
+      ctx.fillStyle = '#000000';
+      for (let row = 0; row < state.fog.rows; row++) {
+        for (let col = 0; col < state.fog.cols; col++) {
+          if (state.fog.cells[row]?.[col]) {
+            ctx.fillRect(
+              state.map.gridOffsetX + col * gridSize,
+              state.map.gridOffsetY + row * gridSize,
+              gridSize,
+              gridSize
+            );
+          }
+        }
+      }
+
+      fogCanvasRef.current = canvas;
+      fogCtxRef.current = ctx;
+      lastFogStateRef.current = {
+        cells: state.fog.cells.map(row => [...row]),
+        gridSize,
+        offsetX: state.map.gridOffsetX,
+        offsetY: state.map.gridOffsetY,
+      };
+      return canvas;
+    }
+
+    // Incremental update - only redraw changed cells
+    const ctx = fogCtxRef.current;
+    const lastCells = lastFogStateRef.current!.cells;
+    if (ctx) {
+      ctx.fillStyle = '#000000';
+      for (let row = 0; row < state.fog.rows; row++) {
+        for (let col = 0; col < state.fog.cols; col++) {
+          const wasFogged = lastCells[row]?.[col] ?? false;
+          const isFogged = state.fog.cells[row]?.[col] ?? false;
+          if (wasFogged !== isFogged) {
+            const x = state.map.gridOffsetX + col * gridSize;
+            const y = state.map.gridOffsetY + row * gridSize;
+            if (isFogged) {
+              ctx.fillRect(x, y, gridSize, gridSize);
+            } else {
+              ctx.clearRect(x, y, gridSize, gridSize);
+            }
+            lastCells[row][col] = isFogged;
+          }
         }
       }
     }
 
-    return canvas;
+    return fogCanvasRef.current;
   }, [state.fog, state.map.gridSize, state.map.gridOffsetX, state.map.gridOffsetY, state.map.imageWidth, state.map.imageHeight]);
 
   // Load map image
