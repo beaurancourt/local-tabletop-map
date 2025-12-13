@@ -1,5 +1,5 @@
 import { emit, listen } from '@tauri-apps/api/event';
-import { AppState, FogState, ToolState, PlayerViewport } from './types';
+import { AppState, FogState, BlockState, ToolState, PlayerViewport } from './types';
 
 const SYNC_EVENT = 'vtt-state-sync';
 const VIEWPORT_SYNC_EVENT = 'vtt-viewport-sync';
@@ -24,6 +24,7 @@ export const createDefaultState = (): AppState => ({
     rows: 0,
   },
   drawings: [],
+  blocks: { cells: {} },
   laserPoints: [],
   view: {
     scale: 1,
@@ -46,6 +47,7 @@ export const createDefaultToolState = (): ToolState => ({
   drawColor: '#ff0000',
   drawStrokeWidth: 3,
   laserColor: '#00ff00', // Lime green
+  blockColor: '#ffffff', // White
 });
 
 // Initialize fog grid based on map dimensions
@@ -119,4 +121,29 @@ export function modifyFog(
   }
 
   return { ...fog, cells: newCells };
+}
+
+// Modify blocks at a specific grid position (paint cells with color)
+export function modifyBlocks(
+  blocks: BlockState,
+  gridX: number,
+  gridY: number,
+  brushSize: number,
+  color: string
+): BlockState {
+  const newCells = { ...blocks.cells };
+  const halfBrush = Math.floor(brushSize / 2);
+
+  for (let dy = -halfBrush; dy < brushSize - halfBrush; dy++) {
+    for (let dx = -halfBrush; dx < brushSize - halfBrush; dx++) {
+      const row = gridY + dy;
+      const col = gridX + dx;
+      if (row >= 0 && col >= 0) {
+        const key = `${row},${col}`;
+        newCells[key] = color;
+      }
+    }
+  }
+
+  return { cells: newCells };
 }

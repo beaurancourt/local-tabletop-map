@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Stage, Layer, Image, Line, Rect, Group } from 'react-konva';
 import Konva from 'konva';
 import { AppState, ToolState, Drawing, DrawingPoint, PlayerViewport } from '../types';
-import { modifyFog } from '../store';
+import { modifyFog, modifyBlocks } from '../store';
 
 interface MapCanvasProps {
   state: AppState;
@@ -12,6 +12,8 @@ interface MapCanvasProps {
   onFogOperationStart?: () => void; // Called when fog operation starts
   onFogOperationEnd?: () => void; // Called when fog operation ends
   onDrawingAdded?: (drawing: Drawing) => void; // Called when a drawing is completed
+  onBlockOperationStart?: () => void; // Called when block operation starts
+  onBlockOperationEnd?: () => void; // Called when block operation ends
   width: number;
   height: number;
   playerViewport?: PlayerViewport | null;
@@ -25,6 +27,8 @@ export function MapCanvas({
   onFogOperationStart,
   onFogOperationEnd,
   onDrawingAdded,
+  onBlockOperationStart,
+  onBlockOperationEnd,
   width,
   height,
   playerViewport,
@@ -33,6 +37,7 @@ export function MapCanvas({
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isFogging, setIsFogging] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
   const [currentDrawing, setCurrentDrawing] = useState<DrawingPoint[]>([]);
 
   // Track latest state for operation completion (avoids stale closure issues)
@@ -212,6 +217,11 @@ export function MapCanvas({
       setIsDrawing(true);
       // Update laserPoints in state for sync to player view
       onStateChange({ ...state, laserPoints: [{ x: pos.x, y: pos.y }] });
+    } else if (toolState.activeTool === 'block') {
+      setIsBlocking(true);
+      onBlockOperationStart?.();
+      const newBlocks = modifyBlocks(state.blocks, pos.gridX, pos.gridY, toolState.brushSize, toolState.blockColor);
+      onStateChange({ ...state, blocks: newBlocks });
     } else if (toolState.activeTool === 'pan') {
       // Pan is handled by drag
     }
@@ -242,8 +252,11 @@ export function MapCanvas({
         ...latestStateRef.current,
         laserPoints: [...latestStateRef.current.laserPoints, { x: pos.x, y: pos.y }],
       });
+    } else if (toolState.activeTool === 'block' && isBlocking) {
+      const newBlocks = modifyBlocks(latestStateRef.current.blocks, pos.gridX, pos.gridY, toolState.brushSize, toolState.blockColor);
+      onStateChange({ ...latestStateRef.current, blocks: newBlocks });
     }
-  }, [isPlayerView, onStateChange, toolState, state, getGridPosition, isDrawing]);
+  }, [isPlayerView, onStateChange, toolState, state, getGridPosition, isDrawing, isBlocking]);
 
   // Handle mouse up
   const handleMouseUp = useCallback(() => {
@@ -269,10 +282,14 @@ export function MapCanvas({
     if (isFogging) {
       onFogOperationEnd?.();
     }
+    if (isBlocking) {
+      onBlockOperationEnd?.();
+    }
     setIsDrawing(false);
     setIsFogging(false);
+    setIsBlocking(false);
     setCurrentDrawing([]);
-  }, [isDrawing, isFogging, currentDrawing, onStateChange, onFogOperationEnd, onDrawingAdded, toolState]);
+  }, [isDrawing, isFogging, isBlocking, currentDrawing, onStateChange, onFogOperationEnd, onBlockOperationEnd, onDrawingAdded, toolState]);
 
   // Handle drag for panning
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
@@ -356,6 +373,22 @@ export function MapCanvas({
             })}
           </Group>
         )}
+
+        {/* Blocks (colored grid cells) */}
+        {Object.entries(state.blocks.cells).map(([key, color]) => {
+          const [row, col] = key.split(',').map(Number);
+          const gridSize = state.map.gridSize || 50;
+          return (
+            <Rect
+              key={key}
+              x={state.map.gridOffsetX + col * gridSize}
+              y={state.map.gridOffsetY + row * gridSize}
+              width={gridSize}
+              height={gridSize}
+              fill={color}
+            />
+          );
+        })}
 
         {/* Drawings */}
         {state.drawings.map((drawing) => (

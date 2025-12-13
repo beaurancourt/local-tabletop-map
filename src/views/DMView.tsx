@@ -6,7 +6,7 @@ import { MapCanvas } from '../components/MapCanvas';
 import { Toolbar } from '../components/Toolbar';
 import { GridSettings } from '../components/GridSettings';
 import { CalibrationSettings } from '../components/CalibrationSettings';
-import { AppState, ToolState, PlayerViewport, FogState, Drawing } from '../types';
+import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing } from '../types';
 import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync } from '../store';
 import { saveMapState, loadMapState, applySavedState } from '../persistence';
 import {
@@ -16,6 +16,7 @@ import {
   createDrawingsClearOperation,
   createFogResetOperation,
   createFogClearOperation,
+  createBlockChangeOperation,
 } from '../history';
 
 export function DMView() {
@@ -40,9 +41,16 @@ export function DMView() {
   // Track fog state before operation starts (for computing diff)
   const fogBeforeOperation = useRef<FogState | null>(null);
 
+  // Track blocks state before operation starts (for undo)
+  const blocksBeforeOperation = useRef<BlockState | null>(null);
+
   // Track latest fog state to avoid stale closures
   const latestFogRef = useRef(state.fog);
   latestFogRef.current = state.fog;
+
+  // Track latest blocks state to avoid stale closures
+  const latestBlocksRef = useRef(state.blocks);
+  latestBlocksRef.current = state.blocks;
 
   // Track held keys for continuous panning with diagonal support
   const keysHeld = useRef<Set<string>>(new Set());
@@ -205,6 +213,10 @@ export function DMView() {
           case 'c': // (c)lear - reveal fog
             e.preventDefault();
             setToolState(prev => ({ ...prev, activeTool: 'fogReveal' }));
+            return;
+          case 'b': // (b)lock
+            e.preventDefault();
+            setToolState(prev => ({ ...prev, activeTool: 'block' }));
             return;
         }
       }
@@ -490,6 +502,10 @@ export function DMView() {
     setToolState(prev => ({ ...prev, laserColor: color }));
   };
 
+  const handleBlockColorChange = (color: string) => {
+    setToolState(prev => ({ ...prev, blockColor: color }));
+  };
+
   // State handlers
   const handleStateChange = (newState: AppState) => {
     // Update fog ref immediately (before async React render) for undo/redo tracking
@@ -537,6 +553,33 @@ export function DMView() {
     const operation = createDrawingAddOperation(drawing);
     historyManager.push(operation);
     forceUpdate(n => n + 1);
+  }, [historyManager]);
+
+  // Block operation callbacks (like fog)
+  const handleBlockOperationStart = useCallback(() => {
+    // Capture blocks state before operation for undo
+    blocksBeforeOperation.current = { cells: { ...state.blocks.cells } };
+  }, [state.blocks]);
+
+  const handleBlockOperationEnd = useCallback(() => {
+    if (!blocksBeforeOperation.current) return;
+
+    // Only create operation if blocks actually changed
+    const before = blocksBeforeOperation.current;
+    const after = latestBlocksRef.current;
+    const beforeKeys = Object.keys(before.cells);
+    const afterKeys = Object.keys(after.cells);
+
+    const hasChanges = beforeKeys.length !== afterKeys.length ||
+      afterKeys.some(key => before.cells[key] !== after.cells[key]);
+
+    if (hasChanges) {
+      const operation = createBlockChangeOperation(before, after);
+      historyManager.push(operation);
+      forceUpdate(n => n + 1);
+    }
+
+    blocksBeforeOperation.current = null;
   }, [historyManager]);
 
   const handleClearDrawings = () => {
@@ -641,6 +684,7 @@ export function DMView() {
         onBrushSizeChange={handleBrushSizeChange}
         onDrawColorChange={handleDrawColorChange}
         onLaserColorChange={handleLaserColorChange}
+        onBlockColorChange={handleBlockColorChange}
         onLoadMap={handleLoadMap}
         onOpenPlayerWindow={handleOpenPlayerWindow}
         onClearDrawings={handleClearDrawings}
@@ -660,6 +704,8 @@ export function DMView() {
             onFogOperationStart={handleFogOperationStart}
             onFogOperationEnd={handleFogOperationEnd}
             onDrawingAdded={handleDrawingAdded}
+            onBlockOperationStart={handleBlockOperationStart}
+            onBlockOperationEnd={handleBlockOperationEnd}
             width={showSettings ? windowSize.width - 300 : windowSize.width}
             height={windowSize.height}
             playerViewport={playerViewport}

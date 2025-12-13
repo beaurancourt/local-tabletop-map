@@ -46,6 +46,7 @@ function toSavedState(state: AppState): SavedMapState | null {
     gridOffsetY: state.map.gridOffsetY,
     fog: state.fog,
     drawings: state.drawings,
+    blocks: state.blocks,
     view: state.view,
     playerViewOffset: state.playerViewOffset,
     calibration: state.calibration,
@@ -123,6 +124,10 @@ export function applySavedState(
     },
     fog: savedState.fog,
     drawings: savedState.drawings,
+    // Handle both new BlockState format and legacy array format
+    blocks: savedState.blocks && 'cells' in savedState.blocks
+      ? savedState.blocks
+      : { cells: {} },
     laserPoints: [], // Laser is temporary, never persisted
     view: savedState.view,
     playerViewOffset: savedState.playerViewOffset,

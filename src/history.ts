@@ -1,4 +1,4 @@
-import { AppState, FogState, Drawing } from './types';
+import { AppState, FogState, BlockState, Drawing } from './types';
 
 // Base interface for undoable operations
 export interface Operation {
@@ -81,6 +81,25 @@ export function createDrawingsClearOperation(clearedDrawings: Drawing[]): Drawin
     },
     unapply(state: AppState): AppState {
       return { ...state, drawings: this.clearedDrawings };
+    },
+  };
+}
+
+// Block cells changed (similar to fog change)
+export interface BlockChangeOperation extends Operation {
+  type: 'blockChange';
+  previousBlocks: BlockState;
+}
+
+export function createBlockChangeOperation(previousBlocks: BlockState, newBlocks: BlockState): BlockChangeOperation {
+  return {
+    type: 'blockChange',
+    previousBlocks,
+    apply(state: AppState): AppState {
+      return { ...state, blocks: newBlocks };
+    },
+    unapply(state: AppState): AppState {
+      return { ...state, blocks: this.previousBlocks };
     },
   };
 }

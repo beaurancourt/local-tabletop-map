@@ -6,6 +6,7 @@ const TOOL_NAMES: Record<string, string> = {
   fogHide: 'Hide Fog (F)',
   draw: 'Draw (E)',
   laser: 'Laser (R)',
+  block: 'Block (B)',
 };
 
 interface ToolbarProps {
@@ -13,6 +14,7 @@ interface ToolbarProps {
   onBrushSizeChange: (size: number) => void;
   onDrawColorChange: (color: string) => void;
   onLaserColorChange: (color: string) => void;
+  onBlockColorChange: (color: string) => void;
   onLoadMap: () => void;
   onOpenPlayerWindow: () => void;
   onClearDrawings: () => void;
@@ -27,6 +29,7 @@ export function Toolbar({
   onBrushSizeChange,
   onDrawColorChange,
   onLaserColorChange,
+  onBlockColorChange,
   onLoadMap,
   onOpenPlayerWindow,
   onClearDrawings,
@@ -47,7 +50,7 @@ export function Toolbar({
         <span className="current-tool">{TOOL_NAMES[toolState.activeTool] || toolState.activeTool}</span>
       </div>
 
-      {(toolState.activeTool === 'fogReveal' || toolState.activeTool === 'fogHide') && (
+      {(toolState.activeTool === 'fogReveal' || toolState.activeTool === 'fogHide' || toolState.activeTool === 'block') && (
         <div className="toolbar-section">
           <span className="toolbar-label">Brush:</span>
           <input
@@ -79,6 +82,17 @@ export function Toolbar({
             type="color"
             value={toolState.laserColor}
             onChange={(e) => onLaserColorChange(e.target.value)}
+          />
+        </div>
+      )}
+
+      {toolState.activeTool === 'block' && (
+        <div className="toolbar-section">
+          <span className="toolbar-label">Color:</span>
+          <input
+            type="color"
+            value={toolState.blockColor}
+            onChange={(e) => onBlockColorChange(e.target.value)}
           />
         </div>
       )}

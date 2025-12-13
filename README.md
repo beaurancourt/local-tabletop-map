@@ -80,6 +80,7 @@ npm run tauri build
 | `F` | Fog hide |
 | `E` | Draw tool (pen) |
 | `R` | Laser pointer |
+| `B` | Block tool |
 
 #### Navigation
 | Key | Action |

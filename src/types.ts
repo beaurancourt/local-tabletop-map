@@ -36,6 +36,12 @@ export interface Drawing {
   strokeWidth: number;
 }
 
+export interface BlockState {
+  // Block colors stored as an object with "row,col" keys and color values
+  // This allows efficient lookup and proper JSON serialization
+  cells: Record<string, string>;
+}
+
 export interface ViewState {
   scale: number;
   offsetX: number;
@@ -65,6 +71,7 @@ export interface AppState {
   map: MapState;
   fog: FogState;
   drawings: Drawing[];
+  blocks: BlockState;
   laserPoints: DrawingPoint[]; // Temporary laser pointer (synced to player view, cleared on release)
   view: ViewState;
   playerViewOffset: PlayerViewOffset;
@@ -84,13 +91,14 @@ export interface SavedMapState {
   gridOffsetY: number;
   fog: FogState;
   drawings: Drawing[];
+  blocks: BlockState;
   view: ViewState;
   playerViewOffset: PlayerViewOffset;
   calibration: CalibrationState;
   savedAt: string; // ISO timestamp
 }
 
-export type Tool = 'pan' | 'fogReveal' | 'fogHide' | 'draw' | 'laser';
+export type Tool = 'pan' | 'fogReveal' | 'fogHide' | 'draw' | 'laser' | 'block';
 
 export interface ToolState {
   activeTool: Tool;
@@ -98,4 +106,5 @@ export interface ToolState {
   drawColor: string;
   drawStrokeWidth: number;
   laserColor: string;
+  blockColor: string;
 }
