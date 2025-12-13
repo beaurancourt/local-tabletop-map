@@ -67,16 +67,24 @@ export function MapCanvas({
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
 
+      // Disable image smoothing to prevent anti-aliasing artifacts
+      ctx.imageSmoothingEnabled = false;
+
+      // Fill entire canvas black first, then clear revealed areas
+      // This prevents gaps between cells with decimal grid sizes
       ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Clear revealed areas (where fog is false)
       for (let row = 0; row < state.fog.rows; row++) {
         for (let col = 0; col < state.fog.cols; col++) {
-          if (state.fog.cells[row]?.[col]) {
-            ctx.fillRect(
-              state.map.gridOffsetX + col * gridSize,
-              state.map.gridOffsetY + row * gridSize,
-              gridSize,
-              gridSize
-            );
+          if (!state.fog.cells[row]?.[col]) {
+            // Use Math.floor for position and Math.ceil for size to ensure full coverage
+            const x = Math.floor(state.map.gridOffsetX + col * gridSize);
+            const y = Math.floor(state.map.gridOffsetY + row * gridSize);
+            const w = Math.ceil(gridSize) + 1;
+            const h = Math.ceil(gridSize) + 1;
+            ctx.clearRect(x, y, w, h);
           }
         }
       }
@@ -102,12 +110,15 @@ export function MapCanvas({
           const wasFogged = lastCells[row]?.[col] ?? false;
           const isFogged = state.fog.cells[row]?.[col] ?? false;
           if (wasFogged !== isFogged) {
-            const x = state.map.gridOffsetX + col * gridSize;
-            const y = state.map.gridOffsetY + row * gridSize;
+            // Use Math.floor for position and Math.ceil for size to prevent gaps
+            const x = Math.floor(state.map.gridOffsetX + col * gridSize);
+            const y = Math.floor(state.map.gridOffsetY + row * gridSize);
+            const w = Math.ceil(gridSize) + 1;
+            const h = Math.ceil(gridSize) + 1;
             if (isFogged) {
-              ctx.fillRect(x, y, gridSize, gridSize);
+              ctx.fillRect(x, y, w, h);
             } else {
-              ctx.clearRect(x, y, gridSize, gridSize);
+              ctx.clearRect(x, y, w, h);
             }
             lastCells[row][col] = isFogged;
           }
