@@ -273,7 +273,7 @@ export function DMView() {
             ...prev,
             calibration: {
               ...prev.calibration,
-              pixelsPerInch: Math.max(10, prev.calibration.pixelsPerInch - 5),
+              pixelsPerInch: Math.max(4, prev.calibration.pixelsPerInch - 5),
             },
           }));
           return;

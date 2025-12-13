@@ -28,7 +28,7 @@ export function CalibrationSettings({
         <label>Pixels per inch:</label>
         <input
           type="number"
-          min="10"
+          min="4"
           max="500"
           value={calibration.pixelsPerInch}
           onChange={(e) => onPixelsPerInchChange(parseInt(e.target.value) || 96)}
