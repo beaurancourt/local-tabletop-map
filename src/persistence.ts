@@ -1,9 +1,33 @@
-import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
+import { appDataDir, join } from '@tauri-apps/api/path';
 import { AppState, SavedMapState } from './types';
 
-// Generate the save file path for a map (same location with .vtt.json extension)
-function getSaveFilePath(mapFilePath: string): string {
-  return `${mapFilePath}.vtt.json`;
+// Generate a hash from the map file path for unique save file naming
+function hashPath(path: string): string {
+  // Simple hash function for creating a unique filename from the path
+  let hash = 0;
+  for (let i = 0; i < path.length; i++) {
+    const char = path.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  // Also include the filename for readability
+  const filename = path.split('/').pop()?.replace(/\.[^/.]+$/, '') || 'map';
+  const safeName = filename.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 50);
+  return `${safeName}_${Math.abs(hash).toString(16)}`;
+}
+
+// Get the save directory path
+async function getSaveDir(): Promise<string> {
+  const appData = await appDataDir();
+  return await join(appData, 'maps');
+}
+
+// Generate the save file path for a map (stored in app data directory)
+async function getSaveFilePath(mapFilePath: string): Promise<string> {
+  const saveDir = await getSaveDir();
+  const hash = hashPath(mapFilePath);
+  return await join(saveDir, `${hash}.json`);
 }
 
 // Convert app state to saved state
@@ -29,6 +53,14 @@ function toSavedState(state: AppState): SavedMapState | null {
   };
 }
 
+// Ensure the save directory exists
+async function ensureSaveDir(): Promise<void> {
+  const saveDir = await getSaveDir();
+  if (!await exists(saveDir)) {
+    await mkdir(saveDir, { recursive: true });
+  }
+}
+
 // Save state to disk
 export async function saveMapState(state: AppState): Promise<void> {
   const savedState = toSavedState(state);
@@ -37,13 +69,13 @@ export async function saveMapState(state: AppState): Promise<void> {
     return;
   }
 
-  const saveFilePath = getSaveFilePath(savedState.filePath);
-  const json = JSON.stringify(savedState, null, 2);
-
-  console.log('Attempting to save state to:', saveFilePath);
-  console.log('State gridSize:', savedState.gridSize);
-
   try {
+    await ensureSaveDir();
+    const saveFilePath = await getSaveFilePath(savedState.filePath);
+    const json = JSON.stringify(savedState, null, 2);
+
+    console.log('Attempting to save state to:', saveFilePath);
+
     await writeTextFile(saveFilePath, json);
     console.log('Successfully saved state to:', saveFilePath);
   } catch (err) {
@@ -54,19 +86,17 @@ export async function saveMapState(state: AppState): Promise<void> {
 
 // Load saved state from disk
 export async function loadMapState(mapFilePath: string): Promise<SavedMapState | null> {
-  const saveFilePath = getSaveFilePath(mapFilePath);
-
-  console.log('Attempting to load state from:', saveFilePath);
-
   try {
+    const saveFilePath = await getSaveFilePath(mapFilePath);
+    console.log('Attempting to load state from:', saveFilePath);
+
     const json = await readTextFile(saveFilePath);
     const savedState = JSON.parse(json) as SavedMapState;
     console.log('Loaded saved state from:', saveFilePath);
-    console.log('Loaded gridSize:', savedState.gridSize);
     return savedState;
   } catch (err) {
     // File doesn't exist or couldn't be read - that's fine, just means no saved state
-    console.log('No saved state found for:', mapFilePath, 'Error:', err);
+    console.log('No saved state found for:', mapFilePath);
     return null;
   }
 }
