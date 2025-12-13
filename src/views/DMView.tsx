@@ -130,10 +130,40 @@ export function DMView() {
     };
   }, [state]);
 
+  // Track previous viewport dimensions to detect resize
+  const prevViewportRef = useRef<PlayerViewport | null>(null);
+
   // Listen for player viewport updates
   useEffect(() => {
     const unlisten = onViewportSync((viewport) => {
-      setPlayerViewport(viewport);
+      const prev = prevViewportRef.current;
+
+      // If viewport dimensions changed (resize), adjust offset to keep center fixed
+      if (prev && (prev.width !== viewport.width || prev.height !== viewport.height)) {
+        // Calculate the center point with old dimensions
+        const oldCenterX = prev.x + prev.width / 2;
+        const oldCenterY = prev.y + prev.height / 2;
+
+        // Adjust offset to keep center at the same point
+        const newOffsetX = oldCenterX - viewport.width / 2;
+        const newOffsetY = oldCenterY - viewport.height / 2;
+
+        setState(prevState => ({
+          ...prevState,
+          playerViewOffset: { x: newOffsetX, y: newOffsetY },
+        }));
+
+        // Update viewport with adjusted position
+        setPlayerViewport({
+          ...viewport,
+          x: newOffsetX,
+          y: newOffsetY,
+        });
+      } else {
+        setPlayerViewport(viewport);
+      }
+
+      prevViewportRef.current = viewport;
     });
     return unlisten;
   }, []);
