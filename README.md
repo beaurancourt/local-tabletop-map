@@ -26,7 +26,6 @@ The player view is a clean, distraction-free window designed for display on a TV
 - **Player Viewport Indicator**: See exactly what players can see (green dashed rectangle)
 
 ### Player View
-- **Calibrated Display**: Automatically scales so 1 grid square = 1 inch on your TV
 - **Clean Interface**: No UI elements - just the map, fog, and drawings
 - **Real-time Sync**: Reflects DM's fog reveals, drawings, and laser pointer
 
