@@ -73,6 +73,7 @@ export interface AppState {
   drawings: Drawing[];
   blocks: BlockState;
   laserPoints: DrawingPoint[]; // Temporary laser pointer (synced to player view, cleared on release)
+  laserColor: string; // Laser color (synced to player view)
   view: ViewState;
   playerViewOffset: PlayerViewOffset;
   calibration: CalibrationState;

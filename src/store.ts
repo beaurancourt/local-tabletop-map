@@ -26,6 +26,7 @@ export const createDefaultState = (): AppState => ({
   drawings: [],
   blocks: { cells: {} },
   laserPoints: [],
+  laserColor: '#00ff00', // Default lime green
   view: {
     scale: 1,
     offsetX: 0,

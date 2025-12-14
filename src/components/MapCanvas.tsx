@@ -215,8 +215,8 @@ export function MapCanvas({
       setCurrentDrawing([{ x: pos.x, y: pos.y }]);
     } else if (toolState.activeTool === 'laser') {
       setIsDrawing(true);
-      // Update laserPoints in state for sync to player view
-      onStateChange({ ...state, laserPoints: [{ x: pos.x, y: pos.y }] });
+      // Update laserPoints and laserColor in state for sync to player view
+      onStateChange({ ...state, laserPoints: [{ x: pos.x, y: pos.y }], laserColor: toolState.laserColor });
     } else if (toolState.activeTool === 'block') {
       setIsBlocking(true);
       onBlockOperationStart?.();
@@ -417,7 +417,7 @@ export function MapCanvas({
         {state.laserPoints.length > 1 && (
           <Line
             points={state.laserPoints.flatMap(p => [p.x, p.y])}
-            stroke={toolState?.laserColor || '#00ff00'}
+            stroke={state.laserColor}
             strokeWidth={(toolState?.drawStrokeWidth || 3) / effectiveScale}
             lineCap="round"
             lineJoin="round"
