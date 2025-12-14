@@ -26,7 +26,7 @@ export const createDefaultState = (): AppState => ({
   drawings: [],
   blocks: { cells: {} },
   laserPoints: [],
-  laserColor: '#00ff00', // Default lime green
+  laserColor: '#ff0000', // Default red
   view: {
     scale: 1,
     offsetX: 0,
@@ -47,7 +47,7 @@ export const createDefaultToolState = (): ToolState => ({
   brushSize: 1,
   drawColor: '#ff0000',
   drawStrokeWidth: 3,
-  laserColor: '#00ff00', // Lime green
+  laserColor: '#ff0000', // Red
   blockColor: '#ffffff', // White
 });
 
