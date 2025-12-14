@@ -415,13 +415,24 @@ export function MapCanvas({
 
         {/* Laser pointer (temporary, synced from DM) */}
         {state.laserPoints.length > 1 && (
-          <Line
-            points={state.laserPoints.flatMap(p => [p.x, p.y])}
-            stroke={state.laserColor}
-            strokeWidth={(toolState?.drawStrokeWidth || 3) / effectiveScale}
-            lineCap="round"
-            lineJoin="round"
-          />
+          <>
+            <Line
+              points={state.laserPoints.flatMap(p => [p.x, p.y])}
+              stroke={state.laserColor}
+              strokeWidth={9 / effectiveScale}
+              lineCap="round"
+              lineJoin="round"
+            />
+            {/* Large dot at current laser position */}
+            <Rect
+              x={state.laserPoints[state.laserPoints.length - 1].x - 15 / effectiveScale}
+              y={state.laserPoints[state.laserPoints.length - 1].y - 15 / effectiveScale}
+              width={30 / effectiveScale}
+              height={30 / effectiveScale}
+              fill={state.laserColor}
+              cornerRadius={15 / effectiveScale}
+            />
+          </>
         )}
 
         {/* Fog of War (rendered as single canvas for performance) */}
