@@ -106,12 +106,14 @@ export async function loadMapState(mapFilePath: string): Promise<SavedMapState |
 export function applySavedState(
   currentState: AppState,
   savedState: SavedMapState,
-  imageUrl: string
+  imageUrl: string,
+  playerImageUrl: string | null = null
 ): AppState {
   return {
     ...currentState,
     map: {
       imageUrl,
+      playerImageUrl,
       filePath: savedState.filePath,
       imageWidth: savedState.imageWidth,
       imageHeight: savedState.imageHeight,

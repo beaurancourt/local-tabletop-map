@@ -134,16 +134,22 @@ export function MapCanvas({
     return fogCanvasRef.current;
   }, [state.fog, state.map.gridSize, state.map.gridOffsetX, state.map.gridOffsetY, state.map.imageWidth, state.map.imageHeight]);
 
-  // Load map image
+  // Load map image. In the player window, prefer the player-facing image
+  // (a cartographer bundle supplies a separate one); otherwise fall back to
+  // the shared/DM image.
+  const activeImageUrl =
+    isPlayerView && state.map.playerImageUrl
+      ? state.map.playerImageUrl
+      : state.map.imageUrl;
   useEffect(() => {
-    if (state.map.imageUrl) {
+    if (activeImageUrl) {
       const img = new window.Image();
-      img.src = state.map.imageUrl;
+      img.src = activeImageUrl;
       img.onload = () => setImage(img);
     } else {
       setImage(null);
     }
-  }, [state.map.imageUrl]);
+  }, [activeImageUrl]);
 
   // Handle wheel zoom (DM only)
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {

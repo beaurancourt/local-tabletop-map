@@ -9,6 +9,7 @@ import { CalibrationSettings } from '../components/CalibrationSettings';
 import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing } from '../types';
 import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync } from '../store';
 import { saveMapState, loadMapState, applySavedState } from '../persistence';
+import { loadCartographerBundle, bundleSrcToObjectUrl } from '../cartographer';
 import {
   HistoryManager,
   createFogChangeOperation,
@@ -37,6 +38,7 @@ export function DMView() {
   // History manager for undo/redo (command pattern)
   const historyManager = useMemo(() => new HistoryManager(), []);
   const [, forceUpdate] = useState(0); // To trigger re-render after undo/redo
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Track fog state before operation starts (for computing diff)
   const fogBeforeOperation = useRef<FogState | null>(null);
@@ -430,53 +432,83 @@ export function DMView() {
     try {
       const selected = await open({
         multiple: false,
-        filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
+        filters: [
+          { name: 'Maps', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'json'] },
+          { name: 'Cartographer bundle', extensions: ['json'] },
+          { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] },
+        ],
       });
+      if (!selected) return;
+      setLoadError(null);
 
-      if (selected) {
+      // A cartographer "both views" bundle (`.json`) carries a GM and a
+      // player image. Load both: the DM sees the GM image, the player window
+      // sees the player image. Anything else is a plain image map.
+      const bundle = selected.toLowerCase().endsWith('.json')
+        ? await loadCartographerBundle(selected)
+        : null;
+
+      let imageUrl: string;
+      let playerImageUrl: string | null;
+      let gridSizeOverride: number | null = null;
+      if (bundle) {
+        imageUrl = bundleSrcToObjectUrl(bundle.gm);
+        playerImageUrl = bundleSrcToObjectUrl(bundle.player);
+        // The bundle's cell size is authoritative — align the VTT grid to it.
+        gridSizeOverride = bundle.grid?.cell_size ?? null;
+      } else {
         const fileData = await readFile(selected);
-        const blob = new Blob([fileData]);
-        const url = URL.createObjectURL(blob);
-
-        // Check for saved state
-        const savedState = await loadMapState(selected);
-
-        // Get image dimensions
-        const img = new Image();
-        img.onload = () => {
-          let newState: AppState;
-          if (savedState) {
-            // Restore saved state
-            newState = applySavedState(state, savedState, url);
-          } else {
-            // Initialize fresh state
-            const fog = initializeFog(img.width, img.height, state.map.gridSize);
-            newState = {
-              ...state,
-              map: {
-                ...state.map,
-                imageUrl: url,
-                filePath: selected,
-                imageWidth: img.width,
-                imageHeight: img.height,
-                gridOffsetX: 0,
-                gridOffsetY: 0,
-              },
-              fog,
-              drawings: [],
-              laserPoints: [],
-              view: { scale: 1, offsetX: 0, offsetY: 0 },
-              playerViewOffset: { x: 0, y: 0 },
-            };
-          }
-          setState(newState);
-          // Clear history when loading a new map
-          historyManager.clear();
-        };
-        img.src = url;
+        imageUrl = URL.createObjectURL(new Blob([fileData]));
+        playerImageUrl = null;
       }
+
+      // Check for saved state
+      const savedState = await loadMapState(selected);
+
+      // Get image dimensions (works for raster and SVG data URLs alike)
+      const img = new Image();
+      img.onload = () => {
+        let newState: AppState;
+        if (savedState) {
+          // Restore saved state, re-attaching freshly generated image URLs.
+          newState = applySavedState(state, savedState, imageUrl, playerImageUrl);
+        } else {
+          // Initialize fresh state
+          const gridSize = gridSizeOverride ?? state.map.gridSize;
+          const fog = initializeFog(img.width, img.height, gridSize);
+          newState = {
+            ...state,
+            map: {
+              ...state.map,
+              imageUrl,
+              playerImageUrl,
+              filePath: selected,
+              imageWidth: img.width,
+              imageHeight: img.height,
+              gridSize,
+              gridOffsetX: 0,
+              gridOffsetY: 0,
+            },
+            fog,
+            drawings: [],
+            laserPoints: [],
+            view: { scale: 1, offsetX: 0, offsetY: 0 },
+            playerViewOffset: { x: 0, y: 0 },
+          };
+        }
+        setState(newState);
+        // Clear history when loading a new map
+        historyManager.clear();
+      };
+      img.onerror = () => {
+        const msg = `Failed to decode the ${bundle ? 'GM' : 'map'} image`;
+        console.error(msg, selected);
+        setLoadError(msg);
+      };
+      img.src = imageUrl;
     } catch (err) {
       console.error('Failed to load map:', err);
+      setLoadError(`Failed to load map: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, [state]);
 
@@ -670,6 +702,20 @@ export function DMView() {
 
   return (
     <div className="dm-view">
+      {loadError && (
+        <div
+          style={{
+            position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 1000, background: '#b00020', color: '#fff', padding: '8px 14px',
+            borderRadius: 6, fontSize: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+          }}
+          onClick={() => setLoadError(null)}
+          title="Click to dismiss"
+        >
+          {loadError}
+        </div>
+      )}
+
       {/* Grid Calibration Mode Indicator */}
       {gridCalibration?.active && (
         <div className="calibration-indicator">

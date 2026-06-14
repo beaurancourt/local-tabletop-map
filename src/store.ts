@@ -8,6 +8,7 @@ const VIEWPORT_SYNC_EVENT = 'vtt-viewport-sync';
 export const createDefaultState = (): AppState => ({
   map: {
     imageUrl: null,
+    playerImageUrl: null,
     filePath: null,
     imageWidth: 0,
     imageHeight: 0,

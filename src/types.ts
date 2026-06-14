@@ -5,6 +5,10 @@ export interface Point {
 
 export interface MapState {
   imageUrl: string | null;
+  // Separate image shown in the player window. Set when a cartographer
+  // "both views" bundle is loaded (DM sees `imageUrl`, players see this).
+  // Null for plain image maps, where the player view falls back to imageUrl.
+  playerImageUrl: string | null;
   filePath: string | null; // Original file path for persistence
   imageWidth: number;
   imageHeight: number;
