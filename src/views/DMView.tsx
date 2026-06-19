@@ -6,9 +6,11 @@ import { MapCanvas } from '../components/MapCanvas';
 import { Toolbar } from '../components/Toolbar';
 import { GridSettings } from '../components/GridSettings';
 import { CalibrationSettings } from '../components/CalibrationSettings';
+import { InitiativeTracker } from '../components/InitiativeTracker';
 import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing } from '../types';
 import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync } from '../store';
-import { saveMapState, loadMapState, applySavedState } from '../persistence';
+import { saveMapState, loadMapState, applySavedState, saveInitiative, loadInitiative } from '../persistence';
+import { createEntities, rerollAll } from '../initiative';
 import { loadCartographerBundle, bundleSrcToObjectUrl } from '../cartographer';
 import { loadHexMapFile, buildHexMapMeta, renderHexMapSvg, buildHexLookup, describeHex, type HexMapMeta, type HexCellData } from '../hexmap';
 import {
@@ -144,6 +146,30 @@ export function DMView() {
     };
   }, [state]);
 
+  // Load the persistent initiative roster on startup (global, not per-map).
+  const initiativeLoadedRef = useRef(false);
+  useEffect(() => {
+    loadInitiative().then((entities) => {
+      initiativeLoadedRef.current = true;
+      if (entities.length > 0) {
+        setState(prev => ({ ...prev, initiative: { ...prev.initiative, entities } }));
+      }
+    });
+  }, []);
+
+  // Persist the initiative roster when it changes (debounced).
+  const initiativeSaveTimeoutRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!initiativeLoadedRef.current) return; // Don't overwrite the roster before the initial load finishes
+    if (initiativeSaveTimeoutRef.current) clearTimeout(initiativeSaveTimeoutRef.current);
+    initiativeSaveTimeoutRef.current = window.setTimeout(() => {
+      saveInitiative(state.initiative.entities);
+    }, 1000);
+    return () => {
+      if (initiativeSaveTimeoutRef.current) clearTimeout(initiativeSaveTimeoutRef.current);
+    };
+  }, [state.initiative.entities]);
+
   // Track previous viewport dimensions to detect resize
   const prevViewportRef = useRef<PlayerViewport | null>(null);
 
@@ -188,6 +214,13 @@ export function DMView() {
   // Keyboard handler for various shortcuts and tracking held keys for panning
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore shortcuts while typing in a form field (e.g. the initiative
+      // tracker's name/dice inputs or the settings sidebar).
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
       // Track shift state
       if (e.key === 'Shift') {
         shiftHeld.current = true;
@@ -227,6 +260,10 @@ export function DMView() {
           case 'p': // (p)an — back to pan/select (also opens hex links on .hexm maps)
             e.preventDefault();
             setToolState(prev => ({ ...prev, activeTool: 'pan' }));
+            return;
+          case 'i': // (i)nitiative tracker show/hide
+            e.preventDefault();
+            setState(prev => ({ ...prev, initiative: { ...prev.initiative, visible: !prev.initiative.visible } }));
             return;
         }
       }
@@ -740,6 +777,37 @@ export function DMView() {
     }));
   };
 
+  // Initiative tracker handlers
+  const handleInitiativeAdd = (name: string, count: number, dice: string, isPc: boolean) => {
+    const created = createEntities(name, count, dice, isPc);
+    setState(prev => ({
+      ...prev,
+      initiative: { ...prev.initiative, entities: [...prev.initiative.entities, ...created] },
+    }));
+  };
+
+  const handleInitiativeRemove = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      initiative: { ...prev.initiative, entities: prev.initiative.entities.filter(e => e.id !== id) },
+    }));
+  };
+
+  const handleInitiativeReroll = () => {
+    setState(prev => ({
+      ...prev,
+      initiative: { ...prev.initiative, entities: rerollAll(prev.initiative.entities) },
+    }));
+  };
+
+  // Clear removes NPCs but keeps player characters (the recurring party).
+  const handleInitiativeClear = () => {
+    setState(prev => ({
+      ...prev,
+      initiative: { ...prev.initiative, entities: prev.initiative.entities.filter(e => e.isPc) },
+    }));
+  };
+
   return (
     <div className="dm-view">
       {loadError && (
@@ -826,6 +894,15 @@ export function DMView() {
         onClearFog={handleClearFog}
         showSettings={showSettings}
         onToggleSettings={() => setShowSettings(!showSettings)}
+      />
+
+      <InitiativeTracker
+        initiative={state.initiative}
+        editable={true}
+        onAdd={handleInitiativeAdd}
+        onRemove={handleInitiativeRemove}
+        onReroll={handleInitiativeReroll}
+        onClear={handleInitiativeClear}
       />
 
       <div className="main-content">

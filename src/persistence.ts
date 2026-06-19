@@ -1,6 +1,6 @@
 import { readTextFile, writeTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
-import { AppState, SavedMapState } from './types';
+import { AppState, SavedMapState, InitiativeEntity } from './types';
 
 // Generate a hash from the map file path for unique save file naming
 function hashPath(path: string): string {
@@ -99,6 +99,37 @@ export async function loadMapState(mapFilePath: string): Promise<SavedMapState |
     // File doesn't exist or couldn't be read - that's fine, just means no saved state
     console.log('No saved state found for:', mapFilePath);
     return null;
+  }
+}
+
+// --- Initiative roster (global, not per-map) ---
+// The initiative roster persists between sessions independent of which map is
+// loaded, so it lives in its own file in the app data directory.
+
+async function getInitiativeFilePath(): Promise<string> {
+  const appData = await appDataDir();
+  return await join(appData, 'initiative.json');
+}
+
+export async function saveInitiative(entities: InitiativeEntity[]): Promise<void> {
+  try {
+    await ensureSaveDir(); // also ensures the app data dir exists
+    const filePath = await getInitiativeFilePath();
+    await writeTextFile(filePath, JSON.stringify({ entities }, null, 2));
+  } catch (err) {
+    console.error('Failed to save initiative:', err);
+  }
+}
+
+export async function loadInitiative(): Promise<InitiativeEntity[]> {
+  try {
+    const filePath = await getInitiativeFilePath();
+    const json = await readTextFile(filePath);
+    const parsed = JSON.parse(json) as { entities?: InitiativeEntity[] };
+    return Array.isArray(parsed.entities) ? parsed.entities : [];
+  } catch (err) {
+    // No saved roster yet — start empty.
+    return [];
   }
 }
 

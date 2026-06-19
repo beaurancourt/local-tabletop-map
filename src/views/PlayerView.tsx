@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MapCanvas } from '../components/MapCanvas';
+import { InitiativeTracker } from '../components/InitiativeTracker';
 import { AppState } from '../types';
 import { createDefaultState, onStateSync, syncPlayerViewport } from '../store';
 
@@ -63,6 +64,7 @@ export function PlayerView() {
           <p>Waiting for DM to load a map...</p>
         </div>
       )}
+      <InitiativeTracker initiative={state.initiative} editable={false} />
     </div>
   );
 }

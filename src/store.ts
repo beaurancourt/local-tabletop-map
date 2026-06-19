@@ -42,6 +42,10 @@ export const createDefaultState = (): AppState => ({
     pixelsPerInch: 96, // Default screen DPI
     savedPixelsPerInch: 96, // Saved calibration (Shift+R resets to this)
   },
+  initiative: {
+    visible: false,
+    entities: [],
+  },
 });
 
 export const createDefaultToolState = (): ToolState => ({

@@ -78,6 +78,19 @@ export interface PlayerViewOffset {
   y: number;
 }
 
+export interface InitiativeEntity {
+  id: string;
+  name: string;
+  dice: string; // How this entity rolls initiative, e.g. "1d6", "1d20", "1d20+3"
+  roll: number | null; // Current rolled initiative (null until rolled)
+  isPc: boolean; // Player characters are kept by "Clear" (only NPCs are removed)
+}
+
+export interface InitiativeState {
+  visible: boolean; // Whether the tracker is shown (in both DM and player windows)
+  entities: InitiativeEntity[];
+}
+
 export interface AppState {
   map: MapState;
   fog: FogState;
@@ -88,6 +101,7 @@ export interface AppState {
   view: ViewState;
   playerViewOffset: PlayerViewOffset;
   calibration: CalibrationState;
+  initiative: InitiativeState; // Initiative tracker (synced to player view)
 }
 
 // Persisted state for a map (saved to disk)

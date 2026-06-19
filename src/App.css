@@ -246,3 +246,186 @@ html, body, #root {
   margin-top: 4px;
   opacity: 0.9;
 }
+
+/* Initiative Tracker */
+.initiative-tracker {
+  position: absolute;
+  top: 70px;
+  left: 12px;
+  z-index: 1000;
+  width: 260px;
+  max-height: calc(100% - 90px);
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(26, 26, 26, 0.95);
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* On the player window there is no toolbar, so sit a little higher. Shrink
+   to fit the content (just roll + name) instead of the fixed DM width. */
+.player-view .initiative-tracker {
+  top: 12px;
+  width: auto;
+  min-width: 140px;
+  max-width: 340px;
+}
+
+.player-view .initiative-name {
+  flex: 0 1 auto;
+}
+
+.initiative-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background-color: #2a2a2a;
+  border-bottom: 1px solid #3a3a3a;
+}
+
+.initiative-title {
+  font-weight: bold;
+  color: #4a9eff;
+  font-size: 14px;
+}
+
+.initiative-header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.initiative-tracker button {
+  padding: 4px 8px;
+  background-color: #3a3a3a;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.initiative-tracker button:hover:not(:disabled) {
+  background-color: #4a4a4a;
+}
+
+.initiative-tracker button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.initiative-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+}
+
+.initiative-empty {
+  padding: 10px;
+  color: #888;
+  text-align: center;
+}
+
+.initiative-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+}
+
+.initiative-row:nth-child(odd) {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.initiative-roll {
+  flex: 0 0 28px;
+  text-align: center;
+  font-weight: bold;
+  color: #ffd24a;
+  font-variant-numeric: tabular-nums;
+}
+
+.initiative-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.initiative-dice {
+  flex: 0 0 auto;
+  color: #888;
+  font-size: 11px;
+}
+
+.initiative-pc-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #888;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.initiative-pc-label input {
+  cursor: pointer;
+  accent-color: #4a9eff;
+}
+
+.initiative-remove {
+  flex: 0 0 auto;
+  padding: 0 6px !important;
+  line-height: 1.4;
+  color: #ff6b6b !important;
+}
+
+.initiative-add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid #3a3a3a;
+  background-color: #222;
+}
+
+.initiative-add input {
+  background-color: #1a1a1a;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  padding: 5px 7px;
+  font-size: 12px;
+}
+
+.initiative-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.initiative-add-row label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #888;
+}
+
+.initiative-add-row input[type="number"] {
+  width: 46px;
+}
+
+.initiative-dice-input {
+  width: 64px;
+}
+
+.initiative-dice-input.invalid {
+  border-color: #b00020;
+}
+
+.initiative-add-row button {
+  margin-left: auto;
+}
