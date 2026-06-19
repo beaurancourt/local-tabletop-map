@@ -1,3 +1,5 @@
+import type { HexMapMeta } from './hexmap';
+
 export interface Point {
   x: number;
   y: number;
@@ -18,6 +20,11 @@ export interface MapState {
   gridOpacity: number;
   gridOffsetX: number; // pixel offset for grid alignment
   gridOffsetY: number;
+  // Present when a `.hexm` map is loaded: geometry + resolved per-hex links
+  // used to hit-test clicks and open each hex's key (e.g. in Obsidian).
+  // Null for image/cartographer maps. The visual itself is the rendered SVG
+  // in `imageUrl`, so this stays purely interactive metadata.
+  hexmap: HexMapMeta | null;
 }
 
 export interface FogState {

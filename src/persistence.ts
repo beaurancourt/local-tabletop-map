@@ -123,6 +123,9 @@ export function applySavedState(
       gridOpacity: savedState.gridOpacity,
       gridOffsetX: savedState.gridOffsetX ?? 0,
       gridOffsetY: savedState.gridOffsetY ?? 0,
+      // Re-derived from the `.hexm` file by the loader on each open; the
+      // caller (DMView) overrides this after applying saved state.
+      hexmap: null,
     },
     fog: savedState.fog,
     drawings: savedState.drawings,

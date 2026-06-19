@@ -11,6 +11,10 @@
     "core:window:default",
     "core:window:allow-create",
     "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "obsidian://*" }]
+    },
     "dialog:default",
     "dialog:allow-open",
     "fs:default",

@@ -33,6 +33,37 @@ The player view is a clean, distraction-free window designed for display on a TV
 - Map state (fog, drawings, grid settings, calibration) is automatically saved
 - Reopen a map and pick up exactly where you left off
 
+### Hex Maps (`.hexm`)
+Load a `.hexm` file (via **Load Map**) to render a **hex map color-coded by terrain**. The map is generated from the file's metadata (not an image); with the **pan tool**, hovering a hex shows a pointer and **clicking it opens that hex's key** — typically an `obsidian://` link to the matching note (so a hex on the map jumps straight to its write-up in Obsidian).
+
+`.hexm` is JSON:
+
+```jsonc
+{
+  "format": "vtt-hexmap",
+  "version": 1,
+  "title": "The Verge",
+  "orientation": "flat",        // or "pointy"
+  "hexRadius": 34,               // px, center -> vertex
+  "cols": 49, "rows": 31,
+  "terrains": { "lawful": "#6f9350", "waste": "#6d6962", "water": "#37618f" },
+  "defaultTerrain": "unsettled",
+  "obsidian": { "vault": "my-vault", "file": "HEXKEY" }, // default click target
+  "hexes": [
+    { "col": 25, "row": 16, "terrain": "neutral", "label": "32",
+      "name": "The Drowned Fort", "link": "13-dungeons/32-drowned-fort" }
+    // ...plain terrain hexes need only col/row/terrain
+  ]
+}
+```
+
+- **Coordinates** are 1-based `col`/`row` (matching `CC.RR` hex notation).
+- **`link`** may be a full URL (e.g. `obsidian://...`, `https://...`) or a vault-relative note path (optionally `path#heading` — the heading is honored by Obsidian's Advanced URI plugin). A bare path becomes `obsidian://open?vault=<obsidian.vault>&file=<path>`.
+- Hexes **without** a `link` fall back to `obsidian.file` (the hex-key doc) on click; hexes with neither stay non-interactive.
+- The square grid overlay is hidden automatically for hex maps.
+
+(Implemented in `src/hexmap.ts`; rendered through the same image pipeline as other maps, with the interactive hex layer in `MapCanvas.tsx`.)
+
 ## Installation
 
 ### Download
@@ -81,6 +112,7 @@ npm run tauri build
 | `E` | Draw tool (pen) |
 | `R` | Laser pointer |
 | `B` | Block tool |
+| `P` | Pan / select (also opens hex links on `.hexm` maps) |
 
 #### Navigation
 | Key | Action |

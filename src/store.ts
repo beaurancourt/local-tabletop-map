@@ -18,6 +18,7 @@ export const createDefaultState = (): AppState => ({
     gridOpacity: 0.3,
     gridOffsetX: 0,
     gridOffsetY: 0,
+    hexmap: null,
   },
   fog: {
     cells: [],

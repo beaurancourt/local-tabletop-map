@@ -10,6 +10,7 @@ import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing } fr
 import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync } from '../store';
 import { saveMapState, loadMapState, applySavedState } from '../persistence';
 import { loadCartographerBundle, bundleSrcToObjectUrl } from '../cartographer';
+import { loadHexMapFile, buildHexMapMeta, renderHexMapSvg, buildHexLookup, describeHex, type HexMapMeta, type HexCellData } from '../hexmap';
 import {
   HistoryManager,
   createFogChangeOperation,
@@ -26,6 +27,9 @@ export function DMView() {
   const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
   const [showSettings, setShowSettings] = useState(false);
   const [playerViewport, setPlayerViewport] = useState<PlayerViewport | null>(null);
+  // `.hexm` hover tooltip: per-hex data (not synced — DM-only) + hovered hex.
+  const [hexLookup, setHexLookup] = useState<Record<string, HexCellData> | null>(null);
+  const [hoveredHex, setHoveredHex] = useState<{ col: number; row: number } | null>(null);
 
   // Grid calibration binary search state
   const [gridCalibration, setGridCalibration] = useState<{
@@ -219,6 +223,10 @@ export function DMView() {
           case 'b': // (b)lock
             e.preventDefault();
             setToolState(prev => ({ ...prev, activeTool: 'block' }));
+            return;
+          case 'p': // (p)an — back to pan/select (also opens hex links on .hexm maps)
+            e.preventDefault();
+            setToolState(prev => ({ ...prev, activeTool: 'pan' }));
             return;
         }
       }
@@ -433,7 +441,8 @@ export function DMView() {
       const selected = await open({
         multiple: false,
         filters: [
-          { name: 'Maps', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'json'] },
+          { name: 'Maps', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'json', 'hexm'] },
+          { name: 'Hex map', extensions: ['hexm'] },
           { name: 'Cartographer bundle', extensions: ['json'] },
           { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] },
         ],
@@ -441,17 +450,38 @@ export function DMView() {
       if (!selected) return;
       setLoadError(null);
 
+      const lower = selected.toLowerCase();
+
+      // A `.hexm` file is hex-map metadata: we render it to an SVG (color-
+      // coded by terrain) for the visual, and keep the geometry + per-hex
+      // links so clicking a hex opens its key (e.g. in Obsidian). The DM SVG
+      // shows hex labels; the player SVG hides them.
+      const isHexm = lower.endsWith('.hexm');
+
       // A cartographer "both views" bundle (`.json`) carries a GM and a
       // player image. Load both: the DM sees the GM image, the player window
       // sees the player image. Anything else is a plain image map.
-      const bundle = selected.toLowerCase().endsWith('.json')
+      const bundle = lower.endsWith('.json')
         ? await loadCartographerBundle(selected)
         : null;
 
       let imageUrl: string;
       let playerImageUrl: string | null;
       let gridSizeOverride: number | null = null;
-      if (bundle) {
+      let hexmapMeta: HexMapMeta | null = null;
+      setHoveredHex(null);
+      if (isHexm) {
+        const hexFile = await loadHexMapFile(selected);
+        hexmapMeta = buildHexMapMeta(hexFile);
+        imageUrl = bundleSrcToObjectUrl(renderHexMapSvg(hexFile, { showLabels: true }));
+        playerImageUrl = bundleSrcToObjectUrl(renderHexMapSvg(hexFile, { showLabels: false }));
+        // Hex maps don't use the square grid; size fog cells to the hex and
+        // hide the grid overlay (set below when building state).
+        gridSizeOverride = hexmapMeta.hexRadius;
+        // Per-hex data for the hover tooltip (DM-only; not synced to player).
+        setHexLookup(buildHexLookup(hexFile));
+      } else if (bundle) {
+        setHexLookup(null);
         imageUrl = bundleSrcToObjectUrl(bundle.gm);
         playerImageUrl = bundleSrcToObjectUrl(bundle.player);
         // The bundle's cell size is authoritative — align the VTT grid to it.
@@ -460,6 +490,7 @@ export function DMView() {
         const fileData = await readFile(selected);
         imageUrl = URL.createObjectURL(new Blob([fileData]));
         playerImageUrl = null;
+        setHexLookup(null);
       }
 
       // Check for saved state
@@ -494,6 +525,15 @@ export function DMView() {
             laserPoints: [],
             view: { scale: 1, offsetX: 0, offsetY: 0 },
             playerViewOffset: { x: 0, y: 0 },
+          };
+        }
+        // Attach the interactive hex metadata (re-derived from the `.hexm`
+        // on every load, so it survives the saved-state path too) and hide
+        // the square grid, which is meaningless over hexes.
+        if (hexmapMeta) {
+          newState = {
+            ...newState,
+            map: { ...newState.map, hexmap: hexmapMeta, gridVisible: false },
           };
         }
         setState(newState);
@@ -725,6 +765,54 @@ export function DMView() {
         </div>
       )}
 
+      {/* Terrain legend removed — terrain type + travel rate now live in the hex hover tooltip. */}
+
+      {/* Hex hover tooltip — wilderness-travel data for the hovered hex */}
+      {hexLookup && hoveredHex && (() => {
+        const info = describeHex(hoveredHex.col, hoveredHex.row, hexLookup[`${hoveredHex.col},${hoveredHex.row}`]);
+        const rows: Array<[string, string]> = [
+          ['Terrain', info.terrainLabel],
+          ['Travel speed', info.speed],
+          ['Get-lost (Nav)', info.navigation],
+          ['Encounter dist.', info.encounterDistance],
+          ['Evasion (≤6)', info.evasion],
+          ['Forage food', info.forageFood],
+          ['Forage water', info.forageWater],
+          ['Territory', info.territory],
+          ['Resting', info.encounterFreq],
+        ];
+        return (
+          <div
+            style={{
+              position: 'absolute', top: 12, right: 12, zIndex: 1000,
+              background: 'rgba(20,17,13,0.94)', color: '#eee', padding: '10px 12px',
+              borderRadius: 6, fontSize: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              maxWidth: 280, pointerEvents: 'none',
+            }}
+          >
+            <div style={{ fontWeight: 'bold', marginBottom: 5 }}>
+              Hex {info.coord}{info.name ? ` — ${info.name}` : ''}
+            </div>
+            <table style={{ borderCollapse: 'collapse' }}>
+              <tbody>
+                {rows.map(([k, v]) => (
+                  <tr key={k}>
+                    <td style={{ opacity: 0.6, paddingRight: 10, verticalAlign: 'top', whiteSpace: 'nowrap' }}>{k}</td>
+                    <td>{v}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ marginTop: 6, fontSize: 11, opacity: 0.65, lineHeight: 1.35 }}>
+              Travel 1 enc/hex · Search 1 enc/hr<br />
+              +4 Survival (forage) · +4 Pathfinder/Navigation (lost) · roads &amp; rivers: no lost roll
+            </div>
+            {info.note && <div style={{ marginTop: 6, fontStyle: 'italic', opacity: 0.85 }}>{info.note}</div>}
+            {info.isPoi && <div style={{ marginTop: 4, fontSize: 11, opacity: 0.7 }}>Pan-click to open its key →</div>}
+          </div>
+        );
+      })()}
+
       <Toolbar
         toolState={toolState}
         onBrushSizeChange={handleBrushSizeChange}
@@ -755,6 +843,7 @@ export function DMView() {
             width={showSettings ? windowSize.width - 300 : windowSize.width}
             height={windowSize.height}
             playerViewport={playerViewport}
+            onHexHover={setHoveredHex}
           />
         </div>
 

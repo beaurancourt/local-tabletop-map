@@ -3,6 +3,8 @@ import { Stage, Layer, Image, Line, Rect, Group } from 'react-konva';
 import Konva from 'konva';
 import { AppState, ToolState, Drawing, DrawingPoint, PlayerViewport } from '../types';
 import { modifyFog, modifyBlocks } from '../store';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { hexAtPoint, linkForHex } from '../hexmap';
 
 interface MapCanvasProps {
   state: AppState;
@@ -17,6 +19,7 @@ interface MapCanvasProps {
   width: number;
   height: number;
   playerViewport?: PlayerViewport | null;
+  onHexHover?: (hex: { col: number; row: number } | null) => void; // .hexm hover (DM)
 }
 
 export function MapCanvas({
@@ -32,6 +35,7 @@ export function MapCanvas({
   width,
   height,
   playerViewport,
+  onHexHover,
 }: MapCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -233,12 +237,42 @@ export function MapCanvas({
     }
   }, [isPlayerView, onStateChange, onFogOperationStart, toolState, state, getGridPosition]);
 
+  // Click a hex on a `.hexm` map (DM view, pan tool) to open its key — e.g.
+  // an `obsidian://` link to the hex-key note. A pan drag does not fire click,
+  // so this only triggers on a genuine tap.
+  const handleStageClick = useCallback(() => {
+    if (isPlayerView || !toolState) return;
+    const meta = state.map.hexmap;
+    if (!meta || toolState.activeTool !== 'pan') return;
+    const stage = stageRef.current;
+    if (!stage) return;
+    const pos = getGridPosition(stage);
+    if (!pos) return;
+    const hex = hexAtPoint(meta, pos.x, pos.y);
+    if (!hex) return;
+    const url = linkForHex(meta, hex.col, hex.row);
+    if (url) openUrl(url).catch(err => console.error('Failed to open hex link:', err));
+  }, [isPlayerView, toolState, state.map.hexmap, getGridPosition]);
+
   // Handle mouse move
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (isPlayerView || !onStateChange || !toolState) return;
 
     const stage = stageRef.current;
     if (!stage) return;
+
+    // On a `.hexm` map: report the hovered hex (for the tooltip, any tool) and
+    // show a pointer over linkable hexes (pan tool, which opens the link).
+    const hexmap = state.map.hexmap;
+    if (hexmap) {
+      const hoverPos = getGridPosition(stage);
+      const hoverHex = hoverPos ? hexAtPoint(hexmap, hoverPos.x, hoverPos.y) : null;
+      onHexHover?.(hoverHex);
+      const linked = hoverHex && toolState.activeTool === 'pan'
+        ? !!linkForHex(hexmap, hoverHex.col, hoverHex.row)
+        : false;
+      stage.container().style.cursor = linked ? 'pointer' : 'default';
+    }
 
     // Check if mouse button is held
     if (!(e.evt.buttons & 1)) return;
@@ -262,7 +296,7 @@ export function MapCanvas({
       const newBlocks = modifyBlocks(latestStateRef.current.blocks, pos.gridX, pos.gridY, toolState.brushSize, toolState.blockColor);
       onStateChange({ ...latestStateRef.current, blocks: newBlocks });
     }
-  }, [isPlayerView, onStateChange, toolState, state, getGridPosition, isDrawing, isBlocking]);
+  }, [isPlayerView, onStateChange, toolState, state, getGridPosition, isDrawing, isBlocking, onHexHover]);
 
   // Handle mouse up
   const handleMouseUp = useCallback(() => {
@@ -332,6 +366,8 @@ export function MapCanvas({
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+      onClick={handleStageClick}
+      onMouseLeave={() => onHexHover?.(null)}
     >
       <Layer
         x={effectiveOffset.x}
