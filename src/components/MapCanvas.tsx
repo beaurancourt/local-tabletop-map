@@ -428,6 +428,7 @@ export function MapCanvas({
               width={gridSize}
               height={gridSize}
               fill={color}
+              opacity={isPlayerView ? 1 : 0.5}
             />
           );
         })}
