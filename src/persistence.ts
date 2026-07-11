@@ -47,6 +47,7 @@ function toSavedState(state: AppState): SavedMapState | null {
     fog: state.fog,
     drawings: state.drawings,
     blocks: state.blocks,
+    textLabels: state.textLabels,
     view: state.view,
     playerViewOffset: state.playerViewOffset,
     calibration: state.calibration,
@@ -164,6 +165,7 @@ export function applySavedState(
     blocks: savedState.blocks && 'cells' in savedState.blocks
       ? savedState.blocks
       : { cells: {} },
+    textLabels: savedState.textLabels ?? [],
     laserPoints: [], // Laser is temporary, never persisted
     view: savedState.view,
     playerViewOffset: savedState.playerViewOffset,

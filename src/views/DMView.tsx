@@ -7,7 +7,7 @@ import { Toolbar } from '../components/Toolbar';
 import { GridSettings } from '../components/GridSettings';
 import { CalibrationSettings } from '../components/CalibrationSettings';
 import { InitiativeTracker } from '../components/InitiativeTracker';
-import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing } from '../types';
+import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing, TextLabel } from '../types';
 import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync } from '../store';
 import { saveMapState, loadMapState, applySavedState, saveInitiative, loadInitiative } from '../persistence';
 import { createEntities, rerollAll } from '../initiative';
@@ -21,6 +21,7 @@ import {
   createFogResetOperation,
   createFogClearOperation,
   createBlockChangeOperation,
+  createTextLabelChangeOperation,
 } from '../history';
 
 export function DMView() {
@@ -256,6 +257,10 @@ export function DMView() {
           case 'b': // (b)lock
             e.preventDefault();
             setToolState(prev => ({ ...prev, activeTool: 'block' }));
+            return;
+          case 't': // (t)ext
+            e.preventDefault();
+            setToolState(prev => ({ ...prev, activeTool: 'text' }));
             return;
           case 'p': // (p)an — back to pan/select (also opens hex links on .hexm maps)
             e.preventDefault();
@@ -615,6 +620,22 @@ export function DMView() {
     setToolState(prev => ({ ...prev, blockColor: color }));
   };
 
+  const handleTextColorChange = (color: string) => {
+    setToolState(prev => ({ ...prev, textColor: color }));
+  };
+
+  const handleTextBgColorChange = (color: string) => {
+    setToolState(prev => ({ ...prev, textBgColor: color }));
+  };
+
+  // Text label add/edit/remove — record for undo/redo. State is already
+  // updated by MapCanvas; this only pushes the history operation.
+  const handleTextLabelCommit = useCallback((id: string, before: TextLabel | null, after: TextLabel | null) => {
+    const operation = createTextLabelChangeOperation(id, before, after);
+    historyManager.push(operation);
+    forceUpdate(n => n + 1);
+  }, [historyManager]);
+
   // State handlers
   const handleStateChange = (newState: AppState) => {
     // Update fog ref immediately (before async React render) for undo/redo tracking
@@ -887,6 +908,8 @@ export function DMView() {
         onDrawColorChange={handleDrawColorChange}
         onLaserColorChange={handleLaserColorChange}
         onBlockColorChange={handleBlockColorChange}
+        onTextColorChange={handleTextColorChange}
+        onTextBgColorChange={handleTextBgColorChange}
         onLoadMap={handleLoadMap}
         onOpenPlayerWindow={handleOpenPlayerWindow}
         onClearDrawings={handleClearDrawings}
@@ -917,6 +940,7 @@ export function DMView() {
             onDrawingAdded={handleDrawingAdded}
             onBlockOperationStart={handleBlockOperationStart}
             onBlockOperationEnd={handleBlockOperationEnd}
+            onTextLabelCommit={handleTextLabelCommit}
             width={showSettings ? windowSize.width - 300 : windowSize.width}
             height={windowSize.height}
             playerViewport={playerViewport}

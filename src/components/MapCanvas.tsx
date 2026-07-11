@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { Stage, Layer, Image, Line, Rect, Group } from 'react-konva';
+import { Stage, Layer, Image, Line, Rect, Group, Label, Tag, Text } from 'react-konva';
 import Konva from 'konva';
-import { AppState, ToolState, Drawing, DrawingPoint, PlayerViewport } from '../types';
+import { AppState, ToolState, Drawing, DrawingPoint, PlayerViewport, TextLabel } from '../types';
 import { modifyFog, modifyBlocks } from '../store';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { hexAtPoint, linkForHex } from '../hexmap';
@@ -16,6 +16,7 @@ interface MapCanvasProps {
   onDrawingAdded?: (drawing: Drawing) => void; // Called when a drawing is completed
   onBlockOperationStart?: () => void; // Called when block operation starts
   onBlockOperationEnd?: () => void; // Called when block operation ends
+  onTextLabelCommit?: (id: string, before: TextLabel | null, after: TextLabel | null) => void; // Text label add/edit/remove (for history)
   width: number;
   height: number;
   playerViewport?: PlayerViewport | null;
@@ -32,6 +33,7 @@ export function MapCanvas({
   onDrawingAdded,
   onBlockOperationStart,
   onBlockOperationEnd,
+  onTextLabelCommit,
   width,
   height,
   playerViewport,
@@ -43,6 +45,12 @@ export function MapCanvas({
   const [isFogging, setIsFogging] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
   const [currentDrawing, setCurrentDrawing] = useState<DrawingPoint[]>([]);
+  // Text label being edited (DM only). `before` is the pre-edit label, or null
+  // for a brand-new label; `draft` holds the in-progress edits.
+  const [editingLabel, setEditingLabel] = useState<{ before: TextLabel | null; draft: TextLabel } | null>(null);
+  const editingRef = useRef(editingLabel);
+  editingRef.current = editingLabel;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Track latest state for operation completion (avoids stale closure issues)
   const latestStateRef = useRef(state);
@@ -204,8 +212,74 @@ export function MapCanvas({
     };
   }, [state.view, state.map.gridSize, state.map.gridOffsetX, state.map.gridOffsetY]);
 
+  // --- Text label editing (DM only) ---
+
+  // Commit the label currently being edited: empty text removes the label
+  // (or discards a brand-new one); non-empty text adds/updates it.
+  const commitEdit = useCallback(() => {
+    // Read from a ref (not the setState updater) so we can safely call the
+    // parent's onStateChange here rather than as a side effect during render.
+    const cur = editingRef.current;
+    if (!cur) return; // already committed (guards Enter + blur firing together)
+    editingRef.current = null;
+
+    const text = cur.draft.text.trim();
+    const before = cur.before;
+
+    if (!text) {
+      // Empty: delete an existing label, or discard a brand-new one.
+      if (before && onStateChange) {
+        onStateChange({
+          ...latestStateRef.current,
+          textLabels: latestStateRef.current.textLabels.filter(l => l.id !== before.id),
+        });
+        onTextLabelCommit?.(before.id, before, null);
+      }
+      setEditingLabel(null);
+      return;
+    }
+
+    const after: TextLabel = { ...cur.draft, text };
+    if (onStateChange) {
+      const others = latestStateRef.current.textLabels.filter(l => l.id !== after.id);
+      onStateChange({ ...latestStateRef.current, textLabels: [...others, after] });
+    }
+
+    // Only record history if something actually changed.
+    const changed =
+      !before ||
+      before.text !== after.text ||
+      before.color !== after.color ||
+      before.bgColor !== after.bgColor;
+    if (changed) onTextLabelCommit?.(after.id, before, after);
+    setEditingLabel(null);
+  }, [onStateChange, onTextLabelCommit]);
+
+  const cancelEdit = useCallback(() => {
+    editingRef.current = null;
+    setEditingLabel(null);
+  }, []);
+
+  // Focus and select the textarea when an edit *begins* (keyed on the label id,
+  // not on every keystroke — otherwise re-selecting all text each keystroke
+  // makes the next character overwrite it). Deferred to the next tick so it
+  // runs after the click's mouseup/click finish; otherwise the click on the
+  // (non-focusable) canvas blurs the textarea and discards the empty label.
+  const editingId = editingLabel?.draft.id ?? null;
+  useEffect(() => {
+    if (!editingId) return;
+    const id = window.setTimeout(() => {
+      const ta = textareaRef.current;
+      if (ta) {
+        ta.focus();
+        ta.select();
+      }
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [editingId]);
+
   // Handle mouse down
-  const handleMouseDown = useCallback((_e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (isPlayerView || !onStateChange || !toolState) return;
 
     const stage = stageRef.current;
@@ -213,6 +287,30 @@ export function MapCanvas({
 
     const pos = getGridPosition(stage);
     if (!pos) return;
+
+    if (toolState.activeTool === 'text') {
+      // Existing labels handle themselves: a click edits, a drag moves (see the
+      // Label's onClick/onDragEnd). Only a click on empty space creates a new one.
+      const target = e.target;
+      const parent = target.getParent();
+      const onLabel =
+        target.name() === 'textLabel' ||
+        !!(parent && parent.name?.() === 'textLabel');
+      if (onLabel) return;
+
+      const fontSize = Math.max(14, Math.round((state.map.gridSize || 50) * 0.5));
+      const draft: TextLabel = {
+        id: Date.now().toString(),
+        x: pos.x,
+        y: pos.y,
+        text: '',
+        color: toolState.textColor,
+        bgColor: toolState.textBgColor,
+        fontSize,
+      };
+      setEditingLabel({ before: null, draft });
+      return;
+    }
 
     if (toolState.activeTool === 'fogReveal' || toolState.activeTool === 'fogHide') {
       setIsFogging(true);
@@ -334,6 +432,9 @@ export function MapCanvas({
   // Handle drag for panning
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     if (isPlayerView || !onStateChange) return;
+    // Drag events bubble: only handle the Layer's own pan drag, not a child
+    // (e.g. a text label) being dragged, whose position ≠ the view offset.
+    if (e.target !== e.currentTarget) return;
 
     onStateChange({
       ...state,
@@ -357,7 +458,18 @@ export function MapCanvas({
     ? { x: -state.playerViewOffset.x * playerScale, y: -state.playerViewOffset.y * playerScale }
     : { x: state.view.offsetX, y: state.view.offsetY };
 
+  // Screen-space geometry for the text-edit overlay (DM view only).
+  const editScale = state.view.scale;
+  const editScreen = editingLabel
+    ? {
+        left: editingLabel.draft.x * editScale + state.view.offsetX,
+        top: editingLabel.draft.y * editScale + state.view.offsetY,
+        fontSize: editingLabel.draft.fontSize * editScale,
+      }
+    : null;
+
   return (
+    <div style={{ position: 'relative', width, height }}>
     <Stage
       ref={stageRef}
       width={width}
@@ -486,7 +598,58 @@ export function MapCanvas({
           />
         )}
 
-        {/* Player Viewport Indicator (DM view only) */}
+        {/* Text labels (white text on colored, rounded background). GM-only —
+            never rendered in the player view. With the text tool: click to edit,
+            drag to move. */}
+        {!isPlayerView && state.textLabels.map((label) => {
+          // Hide the label currently being edited — the textarea overlay shows it instead.
+          if (editingLabel && editingLabel.draft.id === label.id) return null;
+          const textToolActive = !isPlayerView && toolState?.activeTool === 'text';
+          return (
+            <Label
+              key={label.id}
+              id={label.id}
+              name="textLabel"
+              x={label.x}
+              y={label.y}
+              draggable={textToolActive}
+              onClick={() => {
+                if (!textToolActive) return;
+                setEditingLabel({ before: label, draft: { ...label } });
+              }}
+              onDragEnd={(e) => {
+                e.cancelBubble = true; // don't let this reach the Layer's pan handler
+                const node = e.target;
+                const before = latestStateRef.current.textLabels.find(l => l.id === label.id);
+                if (!before || !onStateChange) return;
+                const after: TextLabel = { ...before, x: node.x(), y: node.y() };
+                onStateChange({
+                  ...latestStateRef.current,
+                  textLabels: latestStateRef.current.textLabels.map(l => l.id === label.id ? after : l),
+                });
+                onTextLabelCommit?.(label.id, before, after);
+              }}
+              onMouseEnter={(e) => {
+                if (textToolActive) e.target.getStage()!.container().style.cursor = 'move';
+              }}
+              onMouseLeave={(e) => {
+                if (textToolActive) e.target.getStage()!.container().style.cursor = 'default';
+              }}
+            >
+              <Tag fill={label.bgColor} cornerRadius={label.fontSize * 0.3} />
+              <Text
+                text={label.text}
+                fontSize={label.fontSize}
+                fill={label.color}
+                padding={label.fontSize * 0.35}
+              />
+            </Label>
+          );
+        })}
+
+        {/* Player Viewport Indicator (DM view only). Purely visual — must not
+            capture clicks (a transparent fill is still hit-testable in Konva),
+            or it would block selecting text labels beneath it. */}
         {!isPlayerView && playerViewport && (
           <Rect
             x={playerViewport.x}
@@ -497,9 +660,57 @@ export function MapCanvas({
             strokeWidth={3 / effectiveScale}
             fill="transparent"
             dash={[10 / effectiveScale, 5 / effectiveScale]}
+            listening={false}
           />
         )}
       </Layer>
     </Stage>
+
+    {/* Text edit overlay (DM only). Positioned over the label anchor. */}
+    {editingLabel && editScreen && (
+      <textarea
+        ref={textareaRef}
+        value={editingLabel.draft.text}
+        onChange={(e) =>
+          setEditingLabel(prev =>
+            prev ? { ...prev, draft: { ...prev.draft, text: e.target.value } } : prev
+          )
+        }
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            commitEdit();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelEdit();
+          }
+        }}
+        onBlur={commitEdit}
+        placeholder="Type…"
+        rows={1}
+        style={{
+          position: 'absolute',
+          left: editScreen.left,
+          top: editScreen.top,
+          margin: 0,
+          border: 'none',
+          outline: 'none',
+          resize: 'none',
+          overflow: 'hidden',
+          padding: `${editScreen.fontSize * 0.35}px`,
+          fontSize: `${editScreen.fontSize}px`,
+          lineHeight: 1.15,
+          fontFamily: 'Arial, sans-serif',
+          color: editingLabel.draft.color,
+          background: editingLabel.draft.bgColor,
+          borderRadius: `${editScreen.fontSize * 0.3}px`,
+          minWidth: `${editScreen.fontSize * 3}px`,
+          boxSizing: 'border-box',
+          zIndex: 1000,
+        }}
+      />
+    )}
+    </div>
   );
 }

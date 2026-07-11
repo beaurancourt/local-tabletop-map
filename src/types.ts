@@ -53,6 +53,16 @@ export interface BlockState {
   cells: Record<string, string>;
 }
 
+export interface TextLabel {
+  id: string;
+  x: number; // map coordinates (top-left anchor)
+  y: number;
+  text: string;
+  color: string; // text color
+  bgColor: string; // background (tag) color
+  fontSize: number; // in map pixels (scales with the map)
+}
+
 export interface ViewState {
   scale: number;
   offsetX: number;
@@ -96,6 +106,7 @@ export interface AppState {
   fog: FogState;
   drawings: Drawing[];
   blocks: BlockState;
+  textLabels: TextLabel[]; // Text annotations placed on the map
   laserPoints: DrawingPoint[]; // Temporary laser pointer (synced to player view, cleared on release)
   laserColor: string; // Laser color (synced to player view)
   view: ViewState;
@@ -118,13 +129,14 @@ export interface SavedMapState {
   fog: FogState;
   drawings: Drawing[];
   blocks: BlockState;
+  textLabels?: TextLabel[]; // Optional for backwards compatibility with older saves
   view: ViewState;
   playerViewOffset: PlayerViewOffset;
   calibration: CalibrationState;
   savedAt: string; // ISO timestamp
 }
 
-export type Tool = 'pan' | 'fogReveal' | 'fogHide' | 'draw' | 'laser' | 'block';
+export type Tool = 'pan' | 'fogReveal' | 'fogHide' | 'draw' | 'laser' | 'block' | 'text';
 
 export interface ToolState {
   activeTool: Tool;
@@ -133,4 +145,6 @@ export interface ToolState {
   drawStrokeWidth: number;
   laserColor: string;
   blockColor: string;
+  textColor: string; // text label foreground
+  textBgColor: string; // text label background
 }

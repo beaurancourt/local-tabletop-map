@@ -7,6 +7,7 @@ const TOOL_NAMES: Record<string, string> = {
   draw: 'Draw (E)',
   laser: 'Laser (R)',
   block: 'Block (B)',
+  text: 'Text (T)',
 };
 
 interface ToolbarProps {
@@ -15,6 +16,8 @@ interface ToolbarProps {
   onDrawColorChange: (color: string) => void;
   onLaserColorChange: (color: string) => void;
   onBlockColorChange: (color: string) => void;
+  onTextColorChange: (color: string) => void;
+  onTextBgColorChange: (color: string) => void;
   onLoadMap: () => void;
   onOpenPlayerWindow: () => void;
   onClearDrawings: () => void;
@@ -30,6 +33,8 @@ export function Toolbar({
   onDrawColorChange,
   onLaserColorChange,
   onBlockColorChange,
+  onTextColorChange,
+  onTextBgColorChange,
   onLoadMap,
   onOpenPlayerWindow,
   onClearDrawings,
@@ -93,6 +98,23 @@ export function Toolbar({
             type="color"
             value={toolState.blockColor}
             onChange={(e) => onBlockColorChange(e.target.value)}
+          />
+        </div>
+      )}
+
+      {toolState.activeTool === 'text' && (
+        <div className="toolbar-section">
+          <span className="toolbar-label">Text:</span>
+          <input
+            type="color"
+            value={toolState.textColor}
+            onChange={(e) => onTextColorChange(e.target.value)}
+          />
+          <span className="toolbar-label">Background:</span>
+          <input
+            type="color"
+            value={toolState.textBgColor}
+            onChange={(e) => onTextBgColorChange(e.target.value)}
           />
         </div>
       )}

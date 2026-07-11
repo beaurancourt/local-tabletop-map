@@ -27,6 +27,7 @@ export const createDefaultState = (): AppState => ({
   },
   drawings: [],
   blocks: { cells: {} },
+  textLabels: [],
   laserPoints: [],
   laserColor: '#ff0000', // Default red
   view: {
@@ -55,6 +56,8 @@ export const createDefaultToolState = (): ToolState => ({
   drawStrokeWidth: 3,
   laserColor: '#ff0000', // Red
   blockColor: '#ffffff', // White
+  textColor: '#ffffff', // White text
+  textBgColor: '#e8791e', // Orange background
 });
 
 // Initialize fog grid based on map dimensions

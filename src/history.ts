@@ -1,4 +1,4 @@
-import { AppState, FogState, BlockState, Drawing } from './types';
+import { AppState, FogState, BlockState, Drawing, TextLabel } from './types';
 
 // Base interface for undoable operations
 export interface Operation {
@@ -100,6 +100,38 @@ export function createBlockChangeOperation(previousBlocks: BlockState, newBlocks
     },
     unapply(state: AppState): AppState {
       return { ...state, blocks: this.previousBlocks };
+    },
+  };
+}
+
+// Text label added, edited, or removed.
+// before=null → add; after=null → remove; both set → edit.
+export interface TextLabelChangeOperation extends Operation {
+  type: 'textLabelChange';
+  id: string;
+  before: TextLabel | null;
+  after: TextLabel | null;
+}
+
+export function createTextLabelChangeOperation(
+  id: string,
+  before: TextLabel | null,
+  after: TextLabel | null
+): TextLabelChangeOperation {
+  const setLabel = (labels: TextLabel[], label: TextLabel | null): TextLabel[] => {
+    const without = labels.filter(l => l.id !== id);
+    return label ? [...without, label] : without;
+  };
+  return {
+    type: 'textLabelChange',
+    id,
+    before,
+    after,
+    apply(state: AppState): AppState {
+      return { ...state, textLabels: setLabel(state.textLabels, this.after) };
+    },
+    unapply(state: AppState): AppState {
+      return { ...state, textLabels: setLabel(state.textLabels, this.before) };
     },
   };
 }
