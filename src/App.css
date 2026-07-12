@@ -259,6 +259,27 @@ html, body, #root {
   background: none;
 }
 
+.settings-sidebar button {
+  padding: 6px 12px;
+  background-color: var(--raised);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  color: var(--parchment);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+.settings-sidebar button:hover:not(:disabled) {
+  background-color: var(--raised-hi);
+  border-color: var(--brass);
+}
+
+.settings-sidebar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* Instrument readouts — mono, tabular, dice-gold figures. */
 .setting-info {
   font-family: var(--mono);
