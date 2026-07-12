@@ -878,7 +878,7 @@ export function DMView() {
         <div
           style={{
             position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 1000, background: '#b00020', color: '#fff', padding: '8px 14px',
+            zIndex: 1000, background: 'var(--ember)', color: '#fff', padding: '8px 14px',
             borderRadius: 6, fontSize: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
           }}
           onClick={() => setLoadError(null)}

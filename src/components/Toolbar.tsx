@@ -47,6 +47,11 @@ export function Toolbar({
 }: ToolbarProps) {
   return (
     <div className="toolbar">
+      <div className="toolbar-brand">
+        <span className="toolbar-pip" />
+        VTT
+      </div>
+
       <div className="toolbar-section">
         <button onClick={onLoadMap}>Load Map</button>
         <button onClick={onOpenPlayerWindow}>Open Player View</button>
@@ -54,7 +59,7 @@ export function Toolbar({
       </div>
 
       <div className="toolbar-section">
-        <span className="toolbar-label">Tool:</span>
+        <span className="toolbar-label">Tool</span>
         <span className="current-tool">{TOOL_NAMES[toolState.activeTool] || toolState.activeTool}</span>
       </div>
 

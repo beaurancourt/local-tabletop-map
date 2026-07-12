@@ -38,7 +38,7 @@ export function CalibrationSettings({
       <div className="setting-row">
         <label>Saved:</label>
         <span>{calibration.savedPixelsPerInch} PPI</span>
-        {isModified && <span style={{ color: '#ff9900', marginLeft: 8 }}>(modified)</span>}
+        {isModified && <span style={{ color: 'var(--brass)', marginLeft: 8 }}>(modified)</span>}
       </div>
 
       <div className="setting-row">
@@ -52,8 +52,8 @@ export function CalibrationSettings({
 
       {map.gridSize > 0 && (
         <div className="setting-info">
-          <p>Player view scale: {(calibration.pixelsPerInch / map.gridSize).toFixed(2)}x</p>
-          <p>1 grid square = {calibration.pixelsPerInch}px = 1 inch</p>
+          <p>Player view scale: <span className="figure">{(calibration.pixelsPerInch / map.gridSize).toFixed(2)}×</span></p>
+          <p>1 grid square = <span className="figure">{calibration.pixelsPerInch}px</span> = 1 inch</p>
         </div>
       )}
 

@@ -40,7 +40,7 @@ export function InitiativeTracker({
   return (
     <div className="initiative-tracker">
       <div className="initiative-header">
-        <span className="initiative-title">Initiative</span>
+        <span className="initiative-title"><span className="tick">◆</span>Initiative</span>
         {editable && (
           <div className="initiative-header-actions">
             <button onClick={onReroll} title="Re-roll all initiative">Reroll</button>
@@ -56,6 +56,10 @@ export function InitiativeTracker({
         {ordered.map((e) => (
           <li key={e.id} className="initiative-row">
             <span className="initiative-roll">{e.roll ?? '—'}</span>
+            <span
+              className={`initiative-marker ${e.isPc ? 'pc' : 'npc'}`}
+              title={e.isPc ? 'Player character' : 'NPC'}
+            />
             <span className="initiative-name">{e.name}</span>
             {editable && <span className="initiative-dice">{e.dice}</span>}
             {editable && (

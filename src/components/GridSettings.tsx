@@ -65,8 +65,8 @@ export function GridSettings({
 
       {map.imageWidth > 0 && map.gridSize > 0 && (
         <div className="setting-info">
-          <p>Map: {map.imageWidth} x {map.imageHeight} px</p>
-          <p>Grid: {Math.ceil(map.imageWidth / map.gridSize)} x {Math.ceil(map.imageHeight / map.gridSize)} squares</p>
+          <p>Map: <span className="figure">{map.imageWidth}</span> x <span className="figure">{map.imageHeight}</span> px</p>
+          <p>Grid: <span className="figure">{Math.ceil(map.imageWidth / map.gridSize)}</span> x <span className="figure">{Math.ceil(map.imageHeight / map.gridSize)}</span> squares</p>
         </div>
       )}
     </div>

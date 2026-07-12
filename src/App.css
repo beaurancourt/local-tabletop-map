@@ -1,3 +1,32 @@
+/* ============================================================
+   Design tokens — "The Dungeon Master's screen, at night"
+   Warm near-black chrome, candlelit brass for interaction,
+   dice-gold for the numbers the instrument reports.
+   ============================================================ */
+:root {
+  --ink:        #14100b;  /* app ground */
+  --screen:     #1c1710;  /* panels, toolbar, tracker */
+  --raised:     #2a2318;  /* buttons, inputs */
+  --raised-hi:  #352c1e;  /* button hover */
+  --edge:       #3a3020;  /* borders, hairlines */
+  --edge-soft:  #271f16;  /* quiet dividers */
+
+  --parchment:  #ece2cf;  /* primary text */
+  --dim:        #a89a80;  /* secondary text */
+  --faint:      #6f6450;  /* captions, help */
+
+  --brass:      #c8963c;  /* accent: active, focus, primary */
+  --brass-lit:  #e6b551;  /* accent hover / glow */
+  --gold:       #f0cf6b;  /* numeric readouts */
+  --ember:      #c65a3f;  /* danger — the one red */
+  --sage:       #8aa05a;  /* confirm / success */
+  --sage-hi:    #9cb46a;
+
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "SF Mono", "Cascadia Code", ui-monospace, Consolas, Menlo, monospace;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -8,9 +37,20 @@ html, body, #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #1a1a1a;
-  color: #e0e0e0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--ink);
+  color: var(--parchment);
+  font-family: var(--sans);
+}
+
+/* Visible keyboard focus everywhere — this app is driven from the keyboard. */
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
 }
 
 /* DM View */
@@ -21,15 +61,39 @@ html, body, #root {
   flex-direction: column;
 }
 
+/* The toolbar is the top rail of the DM's screen: an engraved wordmark,
+   a brass hairline along its edge, the active tool lit like brass. */
 .toolbar {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 8px 16px;
-  background-color: #2a2a2a;
-  border-bottom: 1px solid #3a3a3a;
+  background-color: var(--screen);
+  border-bottom: 1px solid var(--brass);
+  box-shadow: 0 1px 0 rgba(200, 150, 60, 0.15);
   flex-wrap: wrap;
   min-height: 52px;
+}
+
+.toolbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  color: var(--parchment);
+  padding-right: 16px;
+  border-right: 1px solid var(--edge);
+}
+
+.toolbar-pip {
+  width: 6px;
+  height: 6px;
+  background-color: var(--brass);
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px rgba(200, 150, 60, 0.55);
 }
 
 .toolbar-section {
@@ -39,49 +103,62 @@ html, body, #root {
 }
 
 .toolbar-label {
-  font-size: 12px;
-  color: #888;
+  font-family: var(--serif);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 10px;
+  color: var(--faint);
 }
 
 .toolbar-spacer {
   flex-grow: 1;
 }
 
+/* Active tool: a lit brass token, not blue label text. */
 .current-tool {
-  font-weight: bold;
-  color: #4a9eff;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--brass-lit);
+  padding: 3px 11px;
+  border: 1px solid color-mix(in srgb, var(--brass) 50%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--brass) 12%, transparent);
+  box-shadow: inset 0 0 12px rgba(200, 150, 60, 0.18);
 }
 
 .toolbar button {
   padding: 6px 12px;
-  background-color: #3a3a3a;
-  border: 1px solid #4a4a4a;
+  background-color: var(--raised);
+  border: 1px solid var(--edge);
   border-radius: 4px;
-  color: #e0e0e0;
+  color: var(--parchment);
   cursor: pointer;
   font-size: 13px;
-  transition: background-color 0.15s;
+  transition: background-color 0.12s, border-color 0.12s;
 }
 
 .toolbar button:hover {
-  background-color: #4a4a4a;
+  background-color: var(--raised-hi);
+  border-color: var(--brass);
 }
 
 .toolbar button.active {
-  background-color: #5a8f5a;
-  border-color: #6aaf6a;
+  background-color: color-mix(in srgb, var(--sage) 22%, var(--raised));
+  border-color: var(--sage);
 }
 
 .toolbar input[type="range"] {
   width: 80px;
+  accent-color: var(--brass);
 }
 
 .toolbar input[type="color"] {
   width: 32px;
   height: 28px;
-  border: none;
+  border: 1px solid var(--edge);
   border-radius: 4px;
   cursor: pointer;
+  background: none;
 }
 
 .main-content {
@@ -93,7 +170,7 @@ html, body, #root {
 
 .canvas-container {
   flex: 1;
-  background-color: #1a1a1a;
+  background-color: var(--ink);
   overflow: hidden;
 }
 
@@ -103,19 +180,19 @@ html, body, #root {
   top: 50%;
   transform: translateY(-50%);
   padding: 8px 4px;
-  background-color: #3a3a3a;
-  border: 1px solid #4a4a4a;
+  background-color: var(--raised);
+  border: 1px solid var(--edge);
   border-right: none;
   border-radius: 4px 0 0 4px;
-  color: #e0e0e0;
+  color: var(--parchment);
   cursor: pointer;
   z-index: 10;
 }
 
 .settings-sidebar {
   width: 300px;
-  background-color: #2a2a2a;
-  border-left: 1px solid #3a3a3a;
+  background-color: var(--screen);
+  border-left: 1px solid var(--edge);
   padding: 16px;
   overflow-y: auto;
 }
@@ -124,12 +201,24 @@ html, body, #root {
   margin-bottom: 24px;
 }
 
+/* Section titles as engraved rulebook heads with a brass tick. */
 .settings-panel h3 {
-  font-size: 14px;
+  font-family: var(--serif);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 13px;
   margin-bottom: 12px;
-  color: #e0e0e0;
-  border-bottom: 1px solid #3a3a3a;
+  color: var(--parchment);
+  border-bottom: 1px solid var(--edge);
   padding-bottom: 8px;
+}
+
+.settings-panel h3::before {
+  content: "\25C6";
+  color: var(--brass);
+  font-size: 10px;
+  margin-right: 8px;
+  vertical-align: 1px;
 }
 
 .setting-row {
@@ -147,19 +236,35 @@ html, body, #root {
 .setting-row input[type="number"] {
   width: 70px;
   padding: 4px 8px;
-  background-color: #1a1a1a;
-  border: 1px solid #4a4a4a;
+  background-color: var(--ink);
+  border: 1px solid var(--edge);
   border-radius: 4px;
-  color: #e0e0e0;
+  color: var(--parchment);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .setting-row input[type="checkbox"] {
   margin-right: 4px;
+  accent-color: var(--brass);
 }
 
+.setting-row input[type="range"] {
+  accent-color: var(--brass);
+}
+
+.setting-row input[type="color"] {
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: none;
+}
+
+/* Instrument readouts — mono, tabular, dice-gold figures. */
 .setting-info {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
-  color: #888;
+  color: var(--dim);
   margin-top: 8px;
 }
 
@@ -167,18 +272,23 @@ html, body, #root {
   margin-bottom: 4px;
 }
 
+.setting-info .figure {
+  color: var(--gold);
+}
+
 .settings-help {
   font-size: 12px;
-  color: #888;
+  color: var(--dim);
   margin-bottom: 12px;
 }
 
 .calibration-helper {
   font-size: 11px;
-  color: #666;
+  color: var(--faint);
   margin-top: 16px;
   padding: 8px;
-  background-color: #1a1a1a;
+  background-color: var(--ink);
+  border: 1px solid var(--edge-soft);
   border-radius: 4px;
 }
 
@@ -195,7 +305,7 @@ html, body, #root {
   margin-bottom: 2px;
 }
 
-/* Player View */
+/* Player View — stays pure black for the TV. */
 .player-view {
   width: 100%;
   height: 100%;
@@ -206,7 +316,9 @@ html, body, #root {
 }
 
 .waiting-message {
-  color: #666;
+  color: var(--faint);
+  font-family: var(--serif);
+  font-style: italic;
   font-size: 24px;
 }
 
@@ -217,7 +329,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #666;
+  color: var(--faint);
 }
 
 /* Grid Calibration Indicator */
@@ -226,25 +338,32 @@ html, body, #root {
   top: 60px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(90, 90, 200, 0.95);
-  color: #fff;
+  background-color: rgba(28, 23, 16, 0.96);
+  border: 1px solid var(--brass);
+  color: var(--parchment);
   padding: 12px 20px;
   border-radius: 8px;
   z-index: 1000;
   text-align: center;
   font-size: 13px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 .calibration-indicator strong {
   display: block;
   margin-bottom: 4px;
-  font-size: 14px;
+  font-family: var(--serif);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 13px;
+  color: var(--brass);
 }
 
 .calibration-indicator div {
   margin-top: 4px;
   opacity: 0.9;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Initiative Tracker */
@@ -257,10 +376,10 @@ html, body, #root {
   max-height: calc(100% - 90px);
   display: flex;
   flex-direction: column;
-  background-color: rgba(26, 26, 26, 0.95);
-  border: 1px solid #3a3a3a;
+  background-color: rgba(20, 16, 11, 0.95);
+  border: 1px solid var(--edge);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
   font-size: 13px;
   overflow: hidden;
 }
@@ -283,14 +402,22 @@ html, body, #root {
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  background-color: #2a2a2a;
-  border-bottom: 1px solid #3a3a3a;
+  background-color: var(--ink);
+  border-bottom: 1px solid var(--edge);
 }
 
 .initiative-title {
-  font-weight: bold;
-  color: #4a9eff;
-  font-size: 14px;
+  font-family: var(--serif);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+  color: var(--parchment);
+  font-size: 13px;
+}
+
+.initiative-title .tick {
+  color: var(--brass);
+  margin-right: 7px;
 }
 
 .initiative-header-actions {
@@ -300,16 +427,22 @@ html, body, #root {
 
 .initiative-tracker button {
   padding: 4px 8px;
-  background-color: #3a3a3a;
-  border: 1px solid #4a4a4a;
+  background-color: var(--raised);
+  border: 1px solid var(--edge);
   border-radius: 4px;
-  color: #e0e0e0;
+  color: var(--dim);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
+  font-family: var(--serif);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transition: background-color 0.12s, border-color 0.12s;
 }
 
 .initiative-tracker button:hover:not(:disabled) {
-  background-color: #4a4a4a;
+  background-color: var(--raised-hi);
+  border-color: var(--brass);
+  color: var(--parchment);
 }
 
 .initiative-tracker button:disabled {
@@ -326,8 +459,9 @@ html, body, #root {
 
 .initiative-empty {
   padding: 10px;
-  color: #888;
+  color: var(--faint);
   text-align: center;
+  font-style: italic;
 }
 
 .initiative-row {
@@ -338,15 +472,34 @@ html, body, #root {
 }
 
 .initiative-row:nth-child(odd) {
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: rgba(200, 150, 60, 0.04);
 }
 
 .initiative-roll {
-  flex: 0 0 28px;
-  text-align: center;
-  font-weight: bold;
-  color: #ffd24a;
+  flex: 0 0 26px;
+  text-align: right;
+  font-weight: 600;
+  color: var(--gold);
+  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* PC / NPC marker — brass pip for player characters, hollow ring for NPCs.
+   Encodes the split that "Clear" acts on, at a glance. */
+.initiative-marker {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.initiative-marker.pc {
+  background-color: var(--brass);
+  box-shadow: 0 0 6px rgba(200, 150, 60, 0.5);
+}
+
+.initiative-marker.npc {
+  border: 1px solid var(--faint);
 }
 
 .initiative-name {
@@ -358,7 +511,8 @@ html, body, #root {
 
 .initiative-dice {
   flex: 0 0 auto;
-  color: #888;
+  color: var(--faint);
+  font-family: var(--mono);
   font-size: 11px;
 }
 
@@ -366,21 +520,23 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #888;
+  color: var(--dim);
   font-size: 11px;
   cursor: pointer;
 }
 
 .initiative-pc-label input {
   cursor: pointer;
-  accent-color: #4a9eff;
+  accent-color: var(--brass);
 }
 
 .initiative-remove {
   flex: 0 0 auto;
   padding: 0 6px !important;
   line-height: 1.4;
-  color: #ff6b6b !important;
+  color: var(--ember) !important;
+  font-family: var(--sans) !important;
+  font-size: 14px !important;
 }
 
 .initiative-add {
@@ -388,15 +544,15 @@ html, body, #root {
   flex-direction: column;
   gap: 6px;
   padding: 8px 10px;
-  border-top: 1px solid #3a3a3a;
-  background-color: #222;
+  border-top: 1px solid var(--edge);
+  background-color: var(--ink);
 }
 
 .initiative-add input {
-  background-color: #1a1a1a;
-  border: 1px solid #4a4a4a;
+  background-color: var(--raised);
+  border: 1px solid var(--edge);
   border-radius: 4px;
-  color: #e0e0e0;
+  color: var(--parchment);
   padding: 5px 7px;
   font-size: 12px;
 }
@@ -411,19 +567,22 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 3px;
-  color: #888;
+  color: var(--dim);
 }
 
 .initiative-add-row input[type="number"] {
   width: 46px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .initiative-dice-input {
   width: 64px;
+  font-family: var(--mono);
 }
 
 .initiative-dice-input.invalid {
-  border-color: #b00020;
+  border-color: var(--ember);
 }
 
 .initiative-add-row button {
@@ -438,35 +597,48 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(0, 0, 0, 0.66);
 }
 
 .modal {
   width: 460px;
   max-width: calc(100% - 32px);
-  background-color: #232323;
-  border: 1px solid #3a3a3a;
+  background-color: var(--screen);
+  border: 1px solid var(--edge);
   border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
-  padding: 20px;
-  color: #e0e0e0;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
+  padding: 22px;
+  color: var(--parchment);
 }
 
 .modal-title {
-  font-size: 17px;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0.01em;
   margin-bottom: 8px;
+}
+
+.modal-title::before {
+  content: "\25C6";
+  color: var(--brass);
+  font-size: 11px;
+  margin-right: 9px;
+  vertical-align: 2px;
 }
 
 .modal-help {
   font-size: 13px;
-  color: #aaa;
+  color: var(--dim);
   line-height: 1.45;
   margin-bottom: 16px;
 }
 
 .modal-help code {
-  background-color: #333;
-  padding: 1px 4px;
+  font-family: var(--mono);
+  background-color: var(--raised);
+  color: var(--gold);
+  padding: 1px 5px;
   border-radius: 3px;
   font-size: 12px;
 }
@@ -481,12 +653,13 @@ html, body, #root {
 .bundle-row-label {
   width: 130px;
   font-size: 13px;
-  color: #bbb;
+  color: var(--dim);
 }
 
 .bundle-file {
   font-size: 12px;
-  color: #888;
+  color: var(--faint);
+  font-family: var(--mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -495,33 +668,39 @@ html, body, #root {
 .modal button,
 .modal input[type="number"] {
   padding: 6px 12px;
-  background-color: #3a3a3a;
-  border: 1px solid #4a4a4a;
+  background-color: var(--raised);
+  border: 1px solid var(--edge);
   border-radius: 4px;
-  color: #e0e0e0;
+  color: var(--parchment);
   cursor: pointer;
   font-size: 13px;
+  transition: background-color 0.12s, border-color 0.12s;
 }
 
 .modal input[type="number"] {
   cursor: text;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .modal button:hover {
-  background-color: #4a4a4a;
+  background-color: var(--raised-hi);
+  border-color: var(--brass);
 }
 
 .modal button.primary {
-  background-color: #5a8f5a;
-  border-color: #6aaf6a;
+  background-color: color-mix(in srgb, var(--sage) 24%, var(--raised));
+  border-color: var(--sage);
+  color: var(--parchment);
 }
 
 .modal button.primary:hover {
-  background-color: #6aaf6a;
+  background-color: color-mix(in srgb, var(--sage) 34%, var(--raised));
+  border-color: var(--sage-hi);
 }
 
 .modal button:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: default;
 }
 
@@ -534,12 +713,12 @@ html, body, #root {
 
 .bundle-error {
   font-size: 13px;
-  color: #ff8080;
+  color: var(--ember);
   margin-bottom: 8px;
 }
 
 .bundle-success {
   font-size: 13px;
-  color: #7ec87e;
+  color: var(--sage-hi);
   margin-bottom: 8px;
 }
