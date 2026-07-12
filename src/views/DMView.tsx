@@ -8,7 +8,7 @@ import { GridSettings } from '../components/GridSettings';
 import { CalibrationSettings } from '../components/CalibrationSettings';
 import { InitiativeTracker } from '../components/InitiativeTracker';
 import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing, TextLabel } from '../types';
-import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync } from '../store';
+import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync, onStateRequest } from '../store';
 import { saveMapState, loadMapState, applySavedState, saveInitiative, loadInitiative } from '../persistence';
 import { createEntities, rerollAll } from '../initiative';
 import { loadCartographerBundle, bundleSrcToObjectUrl } from '../cartographer';
@@ -125,6 +125,22 @@ export function DMView() {
     syncState(state);
   }, [state]);
 
+  // Respond to a player window's request to (re)broadcast state, so a freshly
+  // opened player renders immediately. Uses a ref for latest state since the
+  // listener is registered once.
+  const latestStateRef = useRef(state);
+  latestStateRef.current = state;
+  useEffect(() => {
+    const unlisten = onStateRequest(() => {
+      syncState(latestStateRef.current);
+    });
+    return unlisten;
+  }, []);
+
+  // Set when a fresh (un-positioned) map is loaded: the next player viewport
+  // sync re-centers the player view precisely, now that its size is known.
+  const pendingCenterRef = useRef(false);
+
   // Auto-save state when it changes (debounced)
   const saveTimeoutRef = useRef<number | null>(null);
   useEffect(() => {
@@ -178,6 +194,23 @@ export function DMView() {
   useEffect(() => {
     const unlisten = onViewportSync((viewport) => {
       const prev = prevViewportRef.current;
+
+      // A fresh map was just loaded: now that we know the player's actual
+      // viewport size, center the view on the map (top-left = map center minus
+      // half the viewport). Takes priority over the resize-adjust below.
+      if (pendingCenterRef.current) {
+        pendingCenterRef.current = false;
+        const { imageWidth, imageHeight } = latestStateRef.current.map;
+        const newOffsetX = imageWidth / 2 - viewport.width / 2;
+        const newOffsetY = imageHeight / 2 - viewport.height / 2;
+        setState(prevState => ({
+          ...prevState,
+          playerViewOffset: { x: newOffsetX, y: newOffsetY },
+        }));
+        setPlayerViewport({ ...viewport, x: newOffsetX, y: newOffsetY });
+        prevViewportRef.current = viewport;
+        return;
+      }
 
       // If viewport dimensions changed (resize), adjust offset to keep center fixed
       if (prev && (prev.width !== viewport.width || prev.height !== viewport.height)) {
@@ -549,6 +582,14 @@ export function DMView() {
           // Initialize fresh state
           const gridSize = gridSizeOverride ?? state.map.gridSize;
           const fog = initializeFog(img.width, img.height, gridSize);
+          // Center the player view on the map. playerViewOffset is the
+          // viewport's top-left in map coords, so we offset by half the
+          // viewport. The player's viewport size may not be known yet (window
+          // not open / not synced) — center with what we have now, and flag a
+          // pending re-center so the next viewport sync lands it precisely.
+          const viewW = playerViewport?.width ?? 0;
+          const viewH = playerViewport?.height ?? 0;
+          pendingCenterRef.current = true;
           newState = {
             ...state,
             map: {
@@ -566,7 +607,7 @@ export function DMView() {
             drawings: [],
             laserPoints: [],
             view: { scale: 1, offsetX: 0, offsetY: 0 },
-            playerViewOffset: { x: 0, y: 0 },
+            playerViewOffset: { x: img.width / 2 - viewW / 2, y: img.height / 2 - viewH / 2 },
           };
         }
         // Attach the interactive hex metadata (re-derived from the `.hexm`
@@ -592,7 +633,7 @@ export function DMView() {
       console.error('Failed to load map:', err);
       setLoadError(`Failed to load map: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [state]);
+  }, [state, playerViewport]);
 
   // Open player window
   const handleOpenPlayerWindow = useCallback(async () => {

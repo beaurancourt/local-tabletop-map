@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MapCanvas } from '../components/MapCanvas';
 import { InitiativeTracker } from '../components/InitiativeTracker';
 import { AppState } from '../types';
-import { createDefaultState, onStateSync, syncPlayerViewport } from '../store';
+import { createDefaultState, onStateSync, syncPlayerViewport, requestState } from '../store';
 
 export function PlayerView() {
   const [state, setState] = useState<AppState>(createDefaultState);
@@ -22,11 +22,16 @@ export function PlayerView() {
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Listen for state updates from DM window
+  // Listen for state updates from DM window, then ask the DM to push the
+  // current state so we render right away instead of waiting for its next
+  // change. (Request after the listener is registered so we don't miss the
+  // reply.)
   useEffect(() => {
     const unlisten = onStateSync((newState) => {
       setState(newState);
     });
+
+    requestState();
 
     return unlisten;
   }, []);

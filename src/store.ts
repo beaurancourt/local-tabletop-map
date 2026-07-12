@@ -3,6 +3,7 @@ import { AppState, FogState, BlockState, ToolState, PlayerViewport } from './typ
 
 const SYNC_EVENT = 'vtt-state-sync';
 const VIEWPORT_SYNC_EVENT = 'vtt-viewport-sync';
+const STATE_REQUEST_EVENT = 'vtt-state-request';
 
 // Default state
 export const createDefaultState = (): AppState => ({
@@ -80,6 +81,29 @@ export function onStateSync(callback: (state: AppState) => void): () => void {
 
   listen<AppState>(SYNC_EVENT, (event) => {
     callback(event.payload);
+  }).then((fn) => {
+    unlisten = fn;
+  });
+
+  return () => {
+    if (unlisten) unlisten();
+  };
+}
+
+// Ask the DM window to (re)broadcast the current state. The player calls this
+// on open so it renders immediately, rather than waiting for the DM's next
+// state change (syncState only fires on change, so a freshly-opened player
+// would otherwise stay blank until the DM touches something).
+export async function requestState(): Promise<void> {
+  await emit(STATE_REQUEST_EVENT);
+}
+
+// Listen (in the DM window) for a player's request to rebroadcast state.
+export function onStateRequest(callback: () => void): () => void {
+  let unlisten: (() => void) | null = null;
+
+  listen(STATE_REQUEST_EVENT, () => {
+    callback();
   }).then((fn) => {
     unlisten = fn;
   });
