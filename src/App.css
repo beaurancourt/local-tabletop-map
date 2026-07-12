@@ -429,3 +429,117 @@ html, body, #root {
 .initiative-add-row button {
   margin-left: auto;
 }
+
+/* Modal (Make Bundle tool) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.modal {
+  width: 460px;
+  max-width: calc(100% - 32px);
+  background-color: #232323;
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  padding: 20px;
+  color: #e0e0e0;
+}
+
+.modal-title {
+  font-size: 17px;
+  margin-bottom: 8px;
+}
+
+.modal-help {
+  font-size: 13px;
+  color: #aaa;
+  line-height: 1.45;
+  margin-bottom: 16px;
+}
+
+.modal-help code {
+  background-color: #333;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.bundle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.bundle-row-label {
+  width: 130px;
+  font-size: 13px;
+  color: #bbb;
+}
+
+.bundle-file {
+  font-size: 12px;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal button,
+.modal input[type="number"] {
+  padding: 6px 12px;
+  background-color: #3a3a3a;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.modal input[type="number"] {
+  cursor: text;
+}
+
+.modal button:hover {
+  background-color: #4a4a4a;
+}
+
+.modal button.primary {
+  background-color: #5a8f5a;
+  border-color: #6aaf6a;
+}
+
+.modal button.primary:hover {
+  background-color: #6aaf6a;
+}
+
+.modal button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.bundle-error {
+  font-size: 13px;
+  color: #ff8080;
+  margin-bottom: 8px;
+}
+
+.bundle-success {
+  font-size: 13px;
+  color: #7ec87e;
+  margin-bottom: 8px;
+}

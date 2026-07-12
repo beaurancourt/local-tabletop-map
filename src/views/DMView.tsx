@@ -7,6 +7,7 @@ import { Toolbar } from '../components/Toolbar';
 import { GridSettings } from '../components/GridSettings';
 import { CalibrationSettings } from '../components/CalibrationSettings';
 import { InitiativeTracker } from '../components/InitiativeTracker';
+import { BundleCreator } from '../components/BundleCreator';
 import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing, TextLabel } from '../types';
 import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync, onStateRequest } from '../store';
 import { saveMapState, loadMapState, applySavedState, saveInitiative, loadInitiative } from '../persistence';
@@ -29,6 +30,7 @@ export function DMView() {
   const [toolState, setToolState] = useState<ToolState>(createDefaultToolState);
   const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
   const [showSettings, setShowSettings] = useState(false);
+  const [showBundleCreator, setShowBundleCreator] = useState(false);
   const [playerViewport, setPlayerViewport] = useState<PlayerViewport | null>(null);
   // `.hexm` hover tooltip: per-hex data (not synced — DM-only) + hovered hex.
   const [hexLookup, setHexLookup] = useState<Record<string, HexCellData> | null>(null);
@@ -953,6 +955,7 @@ export function DMView() {
         onTextBgColorChange={handleTextBgColorChange}
         onLoadMap={handleLoadMap}
         onOpenPlayerWindow={handleOpenPlayerWindow}
+        onMakeBundle={() => setShowBundleCreator(true)}
         onClearDrawings={handleClearDrawings}
         onResetFog={handleResetFog}
         onClearFog={handleClearFog}
@@ -1008,6 +1011,13 @@ export function DMView() {
           </div>
         )}
       </div>
+
+      {showBundleCreator && (
+        <BundleCreator
+          defaultCellSize={state.map.gridSize}
+          onClose={() => setShowBundleCreator(false)}
+        />
+      )}
     </div>
   );
 }

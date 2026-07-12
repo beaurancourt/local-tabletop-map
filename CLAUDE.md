@@ -76,6 +76,19 @@ Image → Grid → Fog → Drawings → Laser → Blocks
 - `persistence.ts`: Auto-saves to `~/.config/vtt/maps/{hash}.json` (debounced 1s)
 - Saves fog, drawings, blocks, grid settings, calibration per map
 
+### Map Formats & Loading
+
+`handleLoadMap` in `DMView.tsx` dispatches on file extension:
+- **Image** (`.jpg/.png/.gif/.webp`): loaded directly as the map.
+- **`.json` cartographer bundle** (`src/cartographer.ts`): a `{ format: 'cartographer-views', gm, player, grid }` wrapper holding two views. The DM sees `gm`, the player window sees `playerImageUrl` (`player`); `grid.cell_size` overrides the grid size. Views are data URLs or raw SVG, turned into blob URLs via `bundleSrcToObjectUrl` (blob URLs stay cheap to broadcast on every state sync).
+- **`.hexm` hex map** (`src/hexmap.ts`): rendered to SVG, with an interactive hex layer.
+
+**Make Bundle tool** (`src/components/BundleCreator.tsx`): a modal (opened from the toolbar) that authors a cartographer bundle from two picked images. Uses `imageBytesToDataUrl` / `buildCartographerBundle` in `cartographer.ts`, and Tauri's `save` dialog + `writeTextFile` (needs `dialog:allow-save` in `src-tauri/capabilities/default.json`).
+
+### Player View Loading
+
+`PlayerView` calls `requestState()` on mount; the DM answers via `onStateRequest` (in `DMView.tsx`) by rebroadcasting current state, so a freshly opened player renders immediately. Fresh maps center the player view: `handleLoadMap` sets `pendingCenterRef`, and the next player-viewport sync computes the centered `playerViewOffset` once the viewport size is known.
+
 ### Rust Backend
 
 Minimal - only `open_player_window` command in `src-tauri/src/lib.rs`. All logic is in TypeScript.

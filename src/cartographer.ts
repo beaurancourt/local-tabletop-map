@@ -56,6 +56,57 @@ export function bundleSrcToObjectUrl(src: string): string {
   return URL.createObjectURL(blob);
 }
 
+// --- Bundle authoring (used by the in-app "Make Bundle" tool) ---
+
+// Guess an image MIME type from a file path's extension. Falls back to a
+// generic binary type so an unknown extension still produces a usable data URL.
+export function mimeForImagePath(path: string): string {
+  const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
+  switch (ext) {
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'svg':
+      return 'image/svg+xml';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+// Base64-encode raw image bytes into a `data:` URL. Encodes in chunks so a
+// large image doesn't blow the call stack when spreading into String.fromCharCode.
+export function imageBytesToDataUrl(bytes: Uint8Array, mime: string): string {
+  let binary = '';
+  const chunkSize = 0x8000; // 32k chars per chunk
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return `data:${mime};base64,${btoa(binary)}`;
+}
+
+// Assemble a cartographer bundle from two already-encoded views (data URLs or
+// raw SVG) and a grid cell size. The loader treats grid.cell_size as the
+// authoritative VTT grid size.
+export function buildCartographerBundle(
+  gm: string,
+  player: string,
+  cellSize: number,
+): CartographerBundle {
+  return {
+    format: 'cartographer-views',
+    version: 1,
+    grid: { cell_size: cellSize },
+    gm,
+    player,
+  };
+}
+
 function dataUrlToBlob(dataUrl: string): Blob {
   const comma = dataUrl.indexOf(',');
   const header = dataUrl.slice('data:'.length, comma);

@@ -20,6 +20,7 @@ interface ToolbarProps {
   onTextBgColorChange: (color: string) => void;
   onLoadMap: () => void;
   onOpenPlayerWindow: () => void;
+  onMakeBundle: () => void;
   onClearDrawings: () => void;
   onResetFog: () => void;
   onClearFog: () => void;
@@ -37,6 +38,7 @@ export function Toolbar({
   onTextBgColorChange,
   onLoadMap,
   onOpenPlayerWindow,
+  onMakeBundle,
   onClearDrawings,
   onResetFog,
   onClearFog,
@@ -48,6 +50,7 @@ export function Toolbar({
       <div className="toolbar-section">
         <button onClick={onLoadMap}>Load Map</button>
         <button onClick={onOpenPlayerWindow}>Open Player View</button>
+        <button onClick={onMakeBundle}>Make Bundle</button>
       </div>
 
       <div className="toolbar-section">

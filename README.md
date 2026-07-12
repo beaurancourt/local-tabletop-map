@@ -17,21 +17,43 @@ The player view is a clean, distraction-free window designed for display on a TV
 ## Features
 
 ### DM View
-- **Map Loading**: Load any image file as your battle map
+- **Map Loading**: Load any image file (or a hex map / combined GM+player bundle) as your battle map
 - **Grid Overlay**: Configurable grid with adjustable size, color, opacity, and offset
 - **Fog of War**: Reveal and hide areas of the map with adjustable brush sizes
 - **Drawing Tools**: Annotate the map with freehand drawings
+- **Block Tool**: Paint solid colored grid cells (walls, hazards, zones) — dimmed on the DM view, solid for players
+- **Text Tool**: Drop movable text labels on the map (GM-only; not shown to players)
 - **Laser Pointer**: Temporarily highlight areas (visible to players in real-time)
+- **Initiative Tracker**: Roll and order combatants; a persistent party roster carries across sessions, and the order can be shown to players
 - **Pan & Zoom**: Navigate large maps easily
 - **Player Viewport Indicator**: See exactly what players can see (green dashed rectangle)
 
 ### Player View
-- **Clean Interface**: No UI elements - just the map, fog, and drawings
-- **Real-time Sync**: Reflects DM's fog reveals, drawings, and laser pointer
+- **Clean Interface**: No UI elements - just the map, fog, drawings, and blocks
+- **Real-time Sync**: Reflects DM's fog reveals, drawings, blocks, laser pointer, and initiative order
+- **Instant Load**: Renders the current map as soon as the window opens, centered on the map
 
 ### Persistence
-- Map state (fog, drawings, grid settings, calibration) is automatically saved
+- Map state (fog, drawings, blocks, text labels, grid settings, calibration) is automatically saved
 - Reopen a map and pick up exactly where you left off
+
+### Combined GM / Player Maps (`.json`)
+
+Some maps have two versions: one for the GM (with secret notes, traps, labels) and a clean one for players. A **cartographer "both views" bundle** packs both into a single `.json` file. Load it with **Load Map** and the DM view shows the GM image while the player window shows the player image.
+
+The bundle is JSON:
+
+```jsonc
+{
+  "format": "cartographer-views",
+  "version": 1,
+  "grid": { "cell_size": 50 },  // px per grid cell — aligns the VTT grid
+  "gm": "data:image/png;base64,...",     // GM image (data URL or raw SVG)
+  "player": "data:image/png;base64,..."  // player image (data URL or raw SVG)
+}
+```
+
+**Making one from two images:** click **Make Bundle** in the toolbar, pick a GM image and a player image, set the grid cell size, and save. The resulting `.json` loads like any other map — no external tools needed, any two images will do.
 
 ### Hex Maps (`.hexm`)
 Load a `.hexm` file (via **Load Map**) to render a **hex map color-coded by terrain**. The map is generated from the file's metadata (not an image); with the **pan tool**, hovering a hex shows a pointer and **clicking it opens that hex's key** — typically an `obsidian://` link to the matching note (so a hex on the map jumps straight to its write-up in Obsidian).
@@ -112,7 +134,9 @@ npm run tauri build
 | `E` | Draw tool (pen) |
 | `R` | Laser pointer |
 | `B` | Block tool |
+| `T` | Text label tool |
 | `P` | Pan / select (also opens hex links on `.hexm` maps) |
+| `I` | Toggle initiative tracker |
 
 #### Navigation
 | Key | Action |
@@ -153,6 +177,8 @@ npm run tauri build
 - **Fog Reveal**: Click/drag to reveal hidden areas to players
 - **Fog Hide**: Click/drag to hide areas from players
 - **Draw**: Freehand drawing that persists on the map
+- **Block**: Click/drag to paint solid colored grid cells; dimmed on the DM view, solid for players
+- **Text**: Click to place a text label, drag to move it (GM-only)
 - **Laser**: Temporary pointer that disappears when you release
 
 ## Development
