@@ -527,6 +527,15 @@ export function DMView() {
       if (!selected) return;
       setLoadError(null);
 
+      // Flush any pending debounced autosave for the outgoing map before we
+      // switch away — otherwise its cleanup discards the save and the last
+      // view/fog/drawing changes made just before switching are lost.
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+        await saveMapState(latestStateRef.current);
+      }
+
       const lower = selected.toLowerCase();
 
       // A `.hexm` file is hex-map metadata: we render it to an SVG (color-
