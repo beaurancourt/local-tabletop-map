@@ -143,6 +143,14 @@ export function DMView() {
   // sync re-centers the player view precisely, now that its size is known.
   const pendingCenterRef = useRef(false);
 
+  // Set on every map load (fresh or restored-from-save): the next player
+  // viewport sync should NOT run the resize-adjust logic below, since a map
+  // switch often changes the reported viewport size (different calibration/
+  // image dimensions) even though the window itself didn't resize. Without
+  // this, that sync would recenter using the outgoing map's offset and
+  // clobber the playerViewOffset we just restored for the incoming map.
+  const skipNextViewportAdjustRef = useRef(false);
+
   // Auto-save state when it changes (debounced)
   const saveTimeoutRef = useRef<number | null>(null);
   useEffect(() => {
@@ -210,6 +218,17 @@ export function DMView() {
           playerViewOffset: { x: newOffsetX, y: newOffsetY },
         }));
         setPlayerViewport({ ...viewport, x: newOffsetX, y: newOffsetY });
+        prevViewportRef.current = viewport;
+        return;
+      }
+
+      // A map was just loaded (fresh-centered case handled above, restored-
+      // from-save case lands here): the current playerViewOffset is already
+      // correct, so accept the reported viewport as-is instead of adjusting.
+      if (skipNextViewportAdjustRef.current) {
+        skipNextViewportAdjustRef.current = false;
+        const { x, y } = latestStateRef.current.playerViewOffset;
+        setPlayerViewport({ ...viewport, x, y });
         prevViewportRef.current = viewport;
         return;
       }
@@ -588,6 +607,10 @@ export function DMView() {
         let newState: AppState;
         if (savedState) {
           // Restore saved state, re-attaching freshly generated image URLs.
+          // The saved playerViewOffset is already correct — suppress the
+          // resize-adjust logic for the next viewport sync so it isn't
+          // clobbered by a spurious "resize" (really just a map switch).
+          skipNextViewportAdjustRef.current = true;
           newState = applySavedState(state, savedState, imageUrl, playerImageUrl);
         } else {
           // Initialize fresh state
