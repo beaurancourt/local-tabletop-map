@@ -46,7 +46,9 @@ export const createDefaultState = (): AppState => ({
   },
   initiative: {
     visible: false,
+    mode: 'classic',
     entities: [],
+    drawSteel: { round: 1, groups: [] },
   },
 });
 

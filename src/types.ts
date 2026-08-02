@@ -96,9 +96,37 @@ export interface InitiativeEntity {
   isPc: boolean; // Player characters are kept by "Clear" (only NPCs are removed)
 }
 
+// Which initiative system is active. Both rosters below are kept
+// independently so switching modes doesn't lose either one's setup.
+export type InitiativeMode = 'classic' | 'draw-steel';
+
+export interface DrawSteelCharacter {
+  id: string;
+  name: string;
+  usedTriggeredAction: boolean; // Reset at the start of each round
+}
+
+// A Draw Steel "group" acts as a single unit during a round: heroes are
+// typically their own group of one, monsters are grouped by encounter (e.g.
+// a warband of goblins). Each group activates at most once per round.
+export interface DrawSteelGroup {
+  id: string;
+  name: string;
+  isPc: boolean; // Hero-side group vs. monster-side group
+  activated: boolean; // Has this group taken its turn this round
+  members: DrawSteelCharacter[];
+}
+
+export interface DrawSteelState {
+  round: number;
+  groups: DrawSteelGroup[];
+}
+
 export interface InitiativeState {
   visible: boolean; // Whether the tracker is shown (in both DM and player windows)
-  entities: InitiativeEntity[];
+  mode: InitiativeMode;
+  entities: InitiativeEntity[]; // Classic-mode roster
+  drawSteel: DrawSteelState; // Draw Steel-mode roster
 }
 
 export interface AppState {

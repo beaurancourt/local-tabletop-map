@@ -1,6 +1,6 @@
 import { readTextFile, writeTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
-import { AppState, SavedMapState, InitiativeEntity } from './types';
+import { AppState, SavedMapState, InitiativeEntity, InitiativeMode, DrawSteelState } from './types';
 
 // Generate a hash from the map file path for unique save file naming
 function hashPath(path: string): string {
@@ -112,25 +112,37 @@ async function getInitiativeFilePath(): Promise<string> {
   return await join(appData, 'initiative.json');
 }
 
-export async function saveInitiative(entities: InitiativeEntity[]): Promise<void> {
+export interface SavedInitiativeState {
+  mode: InitiativeMode;
+  entities: InitiativeEntity[];
+  drawSteel: DrawSteelState;
+}
+
+export async function saveInitiative(state: SavedInitiativeState): Promise<void> {
   try {
     await ensureSaveDir(); // also ensures the app data dir exists
     const filePath = await getInitiativeFilePath();
-    await writeTextFile(filePath, JSON.stringify({ entities }, null, 2));
+    await writeTextFile(filePath, JSON.stringify(state, null, 2));
   } catch (err) {
     console.error('Failed to save initiative:', err);
   }
 }
 
-export async function loadInitiative(): Promise<InitiativeEntity[]> {
+// Returns null if there's no saved roster yet, so the caller can fall back
+// to createDefaultState()'s initiative rather than guessing defaults here.
+export async function loadInitiative(): Promise<SavedInitiativeState | null> {
   try {
     const filePath = await getInitiativeFilePath();
     const json = await readTextFile(filePath);
-    const parsed = JSON.parse(json) as { entities?: InitiativeEntity[] };
-    return Array.isArray(parsed.entities) ? parsed.entities : [];
+    const parsed = JSON.parse(json) as Partial<SavedInitiativeState>;
+    return {
+      mode: parsed.mode === 'draw-steel' ? 'draw-steel' : 'classic',
+      entities: Array.isArray(parsed.entities) ? parsed.entities : [],
+      drawSteel: parsed.drawSteel ?? { round: 1, groups: [] },
+    };
   } catch (err) {
-    // No saved roster yet — start empty.
-    return [];
+    // No saved roster yet.
+    return null;
   }
 }
 

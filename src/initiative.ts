@@ -1,4 +1,4 @@
-import { InitiativeEntity } from './types';
+import { InitiativeEntity, DrawSteelGroup, DrawSteelCharacter } from './types';
 
 // Default dice for a new entity when none is specified.
 export const DEFAULT_DICE = '1d6';
@@ -62,4 +62,37 @@ export function sortedByInitiative(entities: InitiativeEntity[]): InitiativeEnti
     const rb = b.roll ?? -Infinity;
     return rb - ra;
   });
+}
+
+// --- Draw Steel mode ---
+// No rolled initiative: each round, groups take turns activating (at most
+// once each) in whatever order actually happens at the table, tracked here
+// as a simple per-group "activated" flag rather than an enforced order.
+
+export function createDrawSteelGroup(name: string, isPc: boolean): DrawSteelGroup {
+  return {
+    id: nextId(),
+    name: name.trim() || 'Group',
+    isPc,
+    activated: false,
+    members: [],
+  };
+}
+
+export function createDrawSteelCharacter(name: string): DrawSteelCharacter {
+  return {
+    id: nextId(),
+    name: name.trim() || 'Character',
+    usedTriggeredAction: false,
+  };
+}
+
+// Start a new round: every group can activate again, every character's
+// triggered action refreshes.
+export function startNewRound(groups: DrawSteelGroup[]): DrawSteelGroup[] {
+  return groups.map((g) => ({
+    ...g,
+    activated: false,
+    members: g.members.map((m) => ({ ...m, usedTriggeredAction: false })),
+  }));
 }

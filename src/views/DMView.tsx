@@ -8,10 +8,10 @@ import { GridSettings } from '../components/GridSettings';
 import { CalibrationSettings } from '../components/CalibrationSettings';
 import { InitiativeTracker } from '../components/InitiativeTracker';
 import { BundleCreator } from '../components/BundleCreator';
-import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing, TextLabel } from '../types';
+import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing, TextLabel, InitiativeMode } from '../types';
 import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync, onStateRequest } from '../store';
 import { saveMapState, loadMapState, applySavedState, saveInitiative, loadInitiative } from '../persistence';
-import { createEntities, rerollAll } from '../initiative';
+import { createEntities, rerollAll, createDrawSteelGroup, createDrawSteelCharacter, startNewRound } from '../initiative';
 import { loadCartographerBundle, bundleSrcToObjectUrl } from '../cartographer';
 import { loadHexMapFile, buildHexMapMeta, renderHexMapSvg, buildHexLookup, describeHex, type HexMapMeta, type HexCellData } from '../hexmap';
 import {
@@ -24,6 +24,16 @@ import {
   createBlockChangeOperation,
   createTextLabelChangeOperation,
 } from '../history';
+
+// Matches the CalibrationSettings number input's min/max — those HTML
+// attributes only affect the spinner arrows, not typed or keyboard-driven
+// changes, so the actual clamp has to happen here too. Without it, pixels-
+// per-inch (and the player viewport size derived from it) can run away to
+// extreme values that push playerViewOffset far outside the map.
+const MIN_PIXELS_PER_INCH = 4;
+const MAX_PIXELS_PER_INCH = 500;
+const clampPixelsPerInch = (ppi: number) =>
+  Math.min(MAX_PIXELS_PER_INCH, Math.max(MIN_PIXELS_PER_INCH, ppi));
 
 export function DMView() {
   const [state, setState] = useState<AppState>(createDefaultState);
@@ -176,10 +186,10 @@ export function DMView() {
   // Load the persistent initiative roster on startup (global, not per-map).
   const initiativeLoadedRef = useRef(false);
   useEffect(() => {
-    loadInitiative().then((entities) => {
+    loadInitiative().then((saved) => {
       initiativeLoadedRef.current = true;
-      if (entities.length > 0) {
-        setState(prev => ({ ...prev, initiative: { ...prev.initiative, entities } }));
+      if (saved) {
+        setState(prev => ({ ...prev, initiative: { ...prev.initiative, ...saved } }));
       }
     });
   }, []);
@@ -190,12 +200,16 @@ export function DMView() {
     if (!initiativeLoadedRef.current) return; // Don't overwrite the roster before the initial load finishes
     if (initiativeSaveTimeoutRef.current) clearTimeout(initiativeSaveTimeoutRef.current);
     initiativeSaveTimeoutRef.current = window.setTimeout(() => {
-      saveInitiative(state.initiative.entities);
+      saveInitiative({
+        mode: state.initiative.mode,
+        entities: state.initiative.entities,
+        drawSteel: state.initiative.drawSteel,
+      });
     }, 1000);
     return () => {
       if (initiativeSaveTimeoutRef.current) clearTimeout(initiativeSaveTimeoutRef.current);
     };
-  }, [state.initiative.entities]);
+  }, [state.initiative.mode, state.initiative.entities, state.initiative.drawSteel]);
 
   // Track previous viewport dimensions to detect resize
   const prevViewportRef = useRef<PlayerViewport | null>(null);
@@ -270,9 +284,9 @@ export function DMView() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore shortcuts while typing in a form field (e.g. the initiative
-      // tracker's name/dice inputs or the settings sidebar).
+      // tracker's name/dice inputs, its mode select, or the settings sidebar).
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
         return;
       }
 
@@ -380,7 +394,7 @@ export function DMView() {
             ...prev,
             calibration: {
               ...prev.calibration,
-              pixelsPerInch: prev.calibration.pixelsPerInch + 5,
+              pixelsPerInch: clampPixelsPerInch(prev.calibration.pixelsPerInch + 5),
             },
           }));
           return;
@@ -391,7 +405,7 @@ export function DMView() {
             ...prev,
             calibration: {
               ...prev.calibration,
-              pixelsPerInch: Math.max(4, prev.calibration.pixelsPerInch - 5),
+              pixelsPerInch: clampPixelsPerInch(prev.calibration.pixelsPerInch - 5),
             },
           }));
           return;
@@ -850,7 +864,7 @@ export function DMView() {
 
   // Calibration handlers
   const handlePixelsPerInchChange = (ppi: number) => {
-    setState(prev => ({ ...prev, calibration: { ...prev.calibration, pixelsPerInch: ppi } }));
+    setState(prev => ({ ...prev, calibration: { ...prev.calibration, pixelsPerInch: clampPixelsPerInch(ppi) } }));
   };
 
   const handleSaveCalibration = () => {
@@ -901,6 +915,144 @@ export function DMView() {
     setState(prev => ({
       ...prev,
       initiative: { ...prev.initiative, entities: prev.initiative.entities.filter(e => e.isPc) },
+    }));
+  };
+
+  const handleInitiativeModeChange = (mode: InitiativeMode) => {
+    setState(prev => ({ ...prev, initiative: { ...prev.initiative, mode } }));
+  };
+
+  // Draw Steel mode handlers
+  const handleDrawSteelAddGroup = (name: string, isPc: boolean) => {
+    const group = createDrawSteelGroup(name, isPc);
+    setState(prev => ({
+      ...prev,
+      initiative: {
+        ...prev.initiative,
+        drawSteel: { ...prev.initiative.drawSteel, groups: [...prev.initiative.drawSteel.groups, group] },
+      },
+    }));
+  };
+
+  const handleDrawSteelRemoveGroup = (groupId: string) => {
+    setState(prev => ({
+      ...prev,
+      initiative: {
+        ...prev.initiative,
+        drawSteel: {
+          ...prev.initiative.drawSteel,
+          groups: prev.initiative.drawSteel.groups.filter(g => g.id !== groupId),
+        },
+      },
+    }));
+  };
+
+  const handleDrawSteelAddMember = (groupId: string, name: string) => {
+    const member = createDrawSteelCharacter(name);
+    setState(prev => ({
+      ...prev,
+      initiative: {
+        ...prev.initiative,
+        drawSteel: {
+          ...prev.initiative.drawSteel,
+          groups: prev.initiative.drawSteel.groups.map(g =>
+            g.id === groupId ? { ...g, members: [...g.members, member] } : g
+          ),
+        },
+      },
+    }));
+  };
+
+  // Removing a defeated character can leave its group empty — an empty
+  // group serves no purpose, so it's dropped along with the member.
+  const handleDrawSteelRemoveMember = (groupId: string, memberId: string) => {
+    setState(prev => ({
+      ...prev,
+      initiative: {
+        ...prev.initiative,
+        drawSteel: {
+          ...prev.initiative.drawSteel,
+          groups: prev.initiative.drawSteel.groups
+            .map(g => g.id === groupId ? { ...g, members: g.members.filter(m => m.id !== memberId) } : g)
+            .filter(g => g.id !== groupId || g.members.length > 0),
+        },
+      },
+    }));
+  };
+
+  const handleDrawSteelToggleActivated = (groupId: string) => {
+    setState(prev => ({
+      ...prev,
+      initiative: {
+        ...prev.initiative,
+        drawSteel: {
+          ...prev.initiative.drawSteel,
+          groups: prev.initiative.drawSteel.groups.map(g =>
+            g.id === groupId ? { ...g, activated: !g.activated } : g
+          ),
+        },
+      },
+    }));
+  };
+
+  const handleDrawSteelToggleTriggeredAction = (groupId: string, memberId: string) => {
+    setState(prev => ({
+      ...prev,
+      initiative: {
+        ...prev.initiative,
+        drawSteel: {
+          ...prev.initiative.drawSteel,
+          groups: prev.initiative.drawSteel.groups.map(g =>
+            g.id !== groupId ? g : {
+              ...g,
+              members: g.members.map(m =>
+                m.id === memberId ? { ...m, usedTriggeredAction: !m.usedTriggeredAction } : m
+              ),
+            }
+          ),
+        },
+      },
+    }));
+  };
+
+  const handleDrawSteelNewRound = () => {
+    setState(prev => ({
+      ...prev,
+      initiative: {
+        ...prev.initiative,
+        drawSteel: {
+          round: prev.initiative.drawSteel.round + 1,
+          groups: startNewRound(prev.initiative.drawSteel.groups),
+        },
+      },
+    }));
+  };
+
+  // Reset the round count back to 1 without touching the roster — for when
+  // the round counter has drifted (e.g. test rounds while setting up) but
+  // the groups themselves are still right where they should be.
+  const handleDrawSteelResetRound = () => {
+    setState(prev => ({
+      ...prev,
+      initiative: {
+        ...prev.initiative,
+        drawSteel: { ...prev.initiative.drawSteel, round: 1 },
+      },
+    }));
+  };
+
+  // Clear removes monster groups but keeps hero groups (the recurring
+  // party), and resets the round — mirrors classic mode's Clear.
+  const handleDrawSteelClear = () => {
+    setState(prev => ({
+      ...prev,
+      initiative: {
+        ...prev.initiative,
+        drawSteel: {
+          round: 1,
+          groups: startNewRound(prev.initiative.drawSteel.groups.filter(g => g.isPc)),
+        },
+      },
     }));
   };
 
@@ -998,10 +1150,20 @@ export function DMView() {
       <InitiativeTracker
         initiative={state.initiative}
         editable={true}
+        onModeChange={handleInitiativeModeChange}
         onAdd={handleInitiativeAdd}
         onRemove={handleInitiativeRemove}
         onReroll={handleInitiativeReroll}
         onClear={handleInitiativeClear}
+        onDrawSteelAddGroup={handleDrawSteelAddGroup}
+        onDrawSteelRemoveGroup={handleDrawSteelRemoveGroup}
+        onDrawSteelAddMember={handleDrawSteelAddMember}
+        onDrawSteelRemoveMember={handleDrawSteelRemoveMember}
+        onDrawSteelToggleActivated={handleDrawSteelToggleActivated}
+        onDrawSteelToggleTriggeredAction={handleDrawSteelToggleTriggeredAction}
+        onDrawSteelNewRound={handleDrawSteelNewRound}
+        onDrawSteelResetRound={handleDrawSteelResetRound}
+        onDrawSteelClear={handleDrawSteelClear}
       />
 
       <div className="main-content">

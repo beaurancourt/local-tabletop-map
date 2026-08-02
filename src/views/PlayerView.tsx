@@ -70,6 +70,12 @@ export function PlayerView() {
         </div>
       )}
       <InitiativeTracker initiative={state.initiative} editable={false} />
+      {/* A second, upside-down copy anchored to the opposite corner, so
+          players seated across the table (facing the screen from the other
+          side) can read it right-side-up from where they sit. */}
+      <div className="initiative-mirror">
+        <InitiativeTracker initiative={state.initiative} editable={false} />
+      </div>
     </div>
   );
 }

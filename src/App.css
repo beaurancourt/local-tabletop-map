@@ -418,13 +418,36 @@ html, body, #root {
   flex: 0 1 auto;
 }
 
+/* Second copy of the tracker, upside-down in the opposite corner, so players
+   seated across the table can read it right-side-up from their side. */
+.initiative-mirror {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 1000;
+  transform: rotate(180deg);
+}
+
+.initiative-mirror .initiative-tracker {
+  position: static;
+  max-height: calc(100vh - 24px);
+}
+
 .initiative-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 6px;
   padding: 8px 10px;
   background-color: var(--ink);
   border-bottom: 1px solid var(--edge);
+}
+
+.initiative-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 8px;
 }
 
 .initiative-title {
@@ -434,6 +457,7 @@ html, body, #root {
   font-weight: 600;
   color: var(--parchment);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .initiative-title .tick {
@@ -444,6 +468,23 @@ html, body, #root {
 .initiative-header-actions {
   display: flex;
   gap: 6px;
+  justify-content: flex-end;
+}
+
+.initiative-mode-select {
+  background-color: var(--raised);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  color: var(--dim);
+  padding: 3px 5px;
+  font-size: 11px;
+  font-family: var(--serif);
+  cursor: pointer;
+}
+
+.initiative-mode-select:hover {
+  border-color: var(--brass);
+  color: var(--parchment);
 }
 
 .initiative-tracker button {
@@ -608,6 +649,132 @@ html, body, #root {
 
 .initiative-add-row button {
   margin-left: auto;
+}
+
+/* Draw Steel mode */
+.draw-steel-round {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 6px 10px;
+  color: var(--faint);
+  font-family: var(--serif);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 11px;
+  border-bottom: 1px solid var(--edge);
+}
+
+.draw-steel-round-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.draw-steel-round-actions button {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.draw-steel-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.draw-steel-group {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* Activated groups sink back visually — done for the round. */
+.draw-steel-group.activated {
+  opacity: 0.55;
+}
+
+.draw-steel-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.draw-steel-activate {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50% !important;
+  color: var(--faint) !important;
+  font-size: 12px !important;
+}
+
+.draw-steel-group.activated .draw-steel-activate {
+  color: var(--brass) !important;
+  border-color: var(--brass) !important;
+}
+
+.draw-steel-group-name {
+  font-weight: 600;
+}
+
+.draw-steel-members {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 0 0 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.draw-steel-member {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.draw-steel-member-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* Triggered-action bolt: dim/hollow when available, brass and lit once used. */
+.draw-steel-triggered {
+  flex: 0 0 auto;
+  padding: 0 4px !important;
+  color: var(--faint) !important;
+  opacity: 0.5;
+  font-size: 11px !important;
+}
+
+.draw-steel-triggered.used {
+  color: var(--brass) !important;
+  opacity: 1;
+  text-shadow: 0 0 6px rgba(200, 150, 60, 0.5);
+}
+
+.draw-steel-add-member {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 0 34px;
+}
+
+.draw-steel-add-member input {
+  flex: 1 1 auto;
+  background-color: var(--raised);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  color: var(--parchment);
+  padding: 3px 6px;
+  font-size: 11px;
+  min-width: 0;
 }
 
 /* Modal (Make Bundle tool) */
