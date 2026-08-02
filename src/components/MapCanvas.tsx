@@ -60,6 +60,7 @@ export function MapCanvas({
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const lastFogStateRef = useRef<{ cells: boolean[][], gridSize: number, offsetX: number, offsetY: number } | null>(null);
+  const fogImageRef = useRef<Konva.Image | null>(null);
 
   // Update fog canvas incrementally
   const fogCanvas = useMemo(() => {
@@ -146,6 +147,18 @@ export function MapCanvas({
     return fogCanvasRef.current;
   }, [state.fog, state.map.gridSize, state.map.gridOffsetX, state.map.gridOffsetY, state.map.imageWidth, state.map.imageHeight]);
 
+  // Incremental updates above mutate fogCanvasRef.current's pixels in place
+  // and return the SAME canvas element reference, so react-konva's <Image>
+  // sees an unchanged `image` prop and won't know to redraw. Force a redraw
+  // whenever the fog data actually changes (this effect's deps are plain
+  // values/new-each-time objects, unlike fogCanvas's stable ref, so it fires
+  // every time). Without this, the player window's fog reveal only appears
+  // to "catch up" whenever some other prop change happens to force a redraw
+  // (e.g. panning the player viewport).
+  useEffect(() => {
+    fogImageRef.current?.getLayer()?.batchDraw();
+  }, [state.fog]);
+
   // Load map image. In the player window, prefer the player-facing image
   // (a cartographer bundle supplies a separate one); otherwise fall back to
   // the shared/DM image.
@@ -181,7 +194,13 @@ export function MapCanvas({
     };
 
     const direction = e.evt.deltaY > 0 ? -1 : 1;
-    const newScale = Math.max(0.1, Math.min(5, oldScale * (1 + direction * 0.1)));
+    // Let the map zoom out enough to fit the whole image on screen (with room
+    // to spare), rather than a flat 0.1 floor — a fixed floor works for
+    // small maps but silently stops large ones (e.g. 8000+px wide) from ever
+    // fitting in the viewport.
+    const fitScale = Math.min(width / state.map.imageWidth, height / state.map.imageHeight) || 0.1;
+    const minScale = Math.min(0.1, fitScale / 2);
+    const newScale = Math.max(minScale, Math.min(5, oldScale * (1 + direction * 0.1)));
 
     onStateChange({
       ...state,
@@ -192,7 +211,7 @@ export function MapCanvas({
         offsetY: pointer.y - mousePointTo.y * newScale,
       },
     });
-  }, [state, isPlayerView, onStateChange]);
+  }, [state, isPlayerView, onStateChange, width, height]);
 
   // Get grid position from pointer
   const getGridPosition = useCallback((stage: Konva.Stage) => {
@@ -593,6 +612,7 @@ export function MapCanvas({
         {/* Fog of War (rendered as single canvas for performance) */}
         {fogCanvas && (
           <Image
+            ref={fogImageRef}
             image={fogCanvas}
             opacity={isPlayerView ? 1 : 0.5}
           />
