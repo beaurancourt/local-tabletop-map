@@ -6,7 +6,11 @@ import {
   healthColor,
   healthRatio,
   makeToken,
+  normalizeTag,
+  addTokenTag,
+  removeTokenTag,
   tokenCenter,
+  MAX_TAG_LENGTH,
 } from './tokens';
 
 describe('token HP maths', () => {
@@ -51,6 +55,28 @@ describe('token position maths', () => {
   });
 });
 
+describe('token tags', () => {
+  it('normalises case, #, whitespace and length', () => {
+    expect(normalizeTag('  #Prone  ')).toBe('prone');
+    expect(normalizeTag('On   Fire')).toBe('on fire');
+    expect(normalizeTag('   ')).toBe('');
+    expect(normalizeTag('x'.repeat(MAX_TAG_LENGTH + 10))).toHaveLength(MAX_TAG_LENGTH);
+  });
+
+  it('adds, removes and refuses duplicate spellings', () => {
+    let tags: string[] = [];
+    tags = addTokenTag(tags, 'Prone');
+    expect(tags).toEqual(['prone']);
+    const same = addTokenTag(tags, '  #PRONE ');
+    expect(same).toBe(tags);
+    tags = addTokenTag(tags, 'On Fire');
+    expect(tags).toEqual(['prone', 'on fire']);
+    expect(addTokenTag(tags, '   ')).toBe(tags);
+    expect(removeTokenTag(tags, 'Prone')).toEqual(['on fire']);
+    expect(removeTokenTag(tags, 'missing')).toEqual(tags);
+  });
+});
+
 describe('new tokens', () => {
   it('gets a stable non-empty id, owner field and clamped HP', () => {
     const token = makeToken('Goblin', 3, 4, { maxHp: 7, hp: 99 });
@@ -64,6 +90,7 @@ describe('new tokens', () => {
       maxHp: 7,
       hp: 7,
       color: DEFAULT_TOKEN_COLOR,
+      tags: [],
     });
   });
 

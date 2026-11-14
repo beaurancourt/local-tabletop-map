@@ -49,8 +49,49 @@ saved with the map.
 
 ## Tests
 
-`npm test` runs `src/tokens.test.ts`: HP clamping (including unset max), ratio
-bounds, the green/yellow/red/grey thresholds, cell-centre and cell-from-point
-maths, and stable id/owner/defaults from `makeToken`.
+`npm test` runs `src/tokens.test.ts` (9 tests): HP clamping (including unset max),
+ratio bounds, the green/yellow/red/grey thresholds, cell-centre and
+cell-from-point maths, stable id/owner/defaults from `makeToken`, and tag
+normalisation/add/duplicate/remove.
 
 `screenshots/tokens-tv.png` is the TV-scale proof.
+
+## Tags
+
+Tags are labels attached to a token, such as `prone`, `poisoned`, `concentrating`
+or `on fire`.
+
+**Free text plus suggestions.** A tag is free text, with a datalist of common
+conditions/statuses (`TAG_SUGGESTIONS` in `src/tokens.ts`: blinded, blessed,
+burning, charmed, concentrating, cursed, deafened, exhausted, frightened,
+grappled, hidden, incapacitated, invisible, paralysed, poisoned, prone,
+restrained, stunned, unconscious). The DM can type anything; the suggestions make
+the common cases one click.
+
+**One canonical spelling.** `normalizeTag` trims, drops leading `#`, collapses
+whitespace, lower-cases and caps the length at 24 characters. `addTokenTag` refuses
+empty tags and exact duplicates after normalisation, so `Prone`, `#prone` and
+`  PRONE ` are one tag. A genuine typo (`poisioned`) is still a separate tag; the
+suggestion list is the guard against common misspellings, not a fixed vocabulary.
+`removeTokenTag` removes by the same canonical form; unknown tags are a no-op.
+
+**Editing.** A token's tags live in the Token inspector panel (Show Settings →
+Tokens): chips with an × remove, an input with the condition suggestions adds.
+There is no right-click menu or inline editing on the map; the inspector keeps the
+map clean and gives the full list a place.
+
+**Rendering.** Tags are drawn as compact pills under the token's HP bar. At most
+two are shown plus `+N`; each is truncated at 12 characters. The full list is in
+the inspector. They are visible in both DM and player windows. This keeps a token
+with many conditions from becoming a wall of text at TV distance.
+
+**Duration.** A tag is a persistent label with no automatic expiry. Duration and
+end-of-turn removal are condition mechanics, which belong with the initiative
+tracker (and there are two initiative modes); silently expiring token tags on one
+of them would be a trap. That is deliberately left for an initiative/conditions
+card.
+
+**Tests.** `src/tokens.test.ts` covers normalisation (case, leading #, whitespace,
+length cap), add/duplicate/no-op and remove by canonical form, plus the existing HP
+and position maths. `screenshots/tokens-tv.png` shows compact tags and the `+N`
+overflow marker.

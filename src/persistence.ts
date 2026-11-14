@@ -179,7 +179,10 @@ export function applySavedState(
       ? savedState.blocks
       : { cells: {} },
     textLabels: savedState.textLabels ?? [],
-    tokens: savedState.tokens ?? [],
+    tokens: (savedState.tokens ?? []).map((token) => ({
+      ...token,
+      tags: Array.isArray(token.tags) ? token.tags : [],
+    })),
     laserPoints: [], // Laser is temporary, never persisted
     view: savedState.view,
     playerViewOffset: savedState.playerViewOffset,

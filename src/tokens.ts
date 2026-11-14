@@ -2,6 +2,39 @@ import type { Token } from './types';
 
 export const DEFAULT_TOKEN_COLOR = '#4f8cff';
 
+/** Suggested conditions/labels; the input is still free text. */
+export const TAG_SUGGESTIONS = [
+  'blinded', 'blessed', 'burning', 'charmed', 'concentrating', 'cursed',
+  'deafened', 'exhausted', 'frightened', 'grappled', 'hidden', 'incapacitated',
+  'invisible', 'paralysed', 'poisoned', 'prone', 'restrained', 'stunned',
+  'unconscious',
+];
+
+export const MAX_TAG_LENGTH = 24;
+
+/** One canonical form for a tag: no leading #, collapsed spaces, lower-case. */
+export function normalizeTag(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^#+/, '')
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .slice(0, MAX_TAG_LENGTH)
+    .trim();
+}
+
+/** Add unless empty or already present; returns the same array for a no-op. */
+export function addTokenTag(tags: string[], raw: string): string[] {
+  const tag = normalizeTag(raw);
+  if (!tag || tags.includes(tag)) return tags;
+  return [...tags, tag];
+}
+
+export function removeTokenTag(tags: string[], raw: string): string[] {
+  const tag = normalizeTag(raw);
+  return tags.filter((existing) => existing !== tag);
+}
+
 /** HP is clamped to 0..max; an unset max (0) is always 0 HP. */
 export function clampHp(hp: number, maxHp: number): number {
   if (!Number.isFinite(maxHp) || maxHp <= 0) return 0;
@@ -76,5 +109,6 @@ export function makeToken(
     maxHp,
     hp: clampHp(options.hp ?? maxHp, maxHp),
     color: options.color ?? DEFAULT_TOKEN_COLOR,
+    tags: [],
   };
 }

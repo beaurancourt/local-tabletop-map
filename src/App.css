@@ -1055,3 +1055,69 @@ html, body, #root {
   height: 20px;
   padding: 0;
 }
+
+.token-tags {
+  margin-top: 6px;
+}
+
+.token-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-height: 18px;
+}
+
+.token-tags-empty {
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.token-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 2px 1px 6px;
+  border: 1px solid var(--edge-soft);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--parchment);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.token-tag button {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.token-tag button:hover {
+  color: #ef4444;
+  background: transparent;
+}
+
+.token-tag-add {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.token-tag-add input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px 5px;
+  font-size: 10px;
+}
+
+.token-tag-add button {
+  width: auto;
+  margin: 0;
+  padding: 2px 7px;
+  font-size: 10px;
+}

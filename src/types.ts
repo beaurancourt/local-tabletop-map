@@ -76,6 +76,9 @@ export interface Token {
   /** 0 means HP is unset: no health bar is drawn. */
   maxHp: number;
   color: string;
+  /** Free-form labels, stored lower-case so a typo cannot become a second tag
+   *  by case or spacing. Fixed suggestions live in TAG_SUGGESTIONS. */
+  tags: string[];
 }
 
 export interface ViewState {

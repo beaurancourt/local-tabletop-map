@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { Token } from '../types';
-import { clampHp, healthColor } from '../tokens';
+import { addTokenTag, clampHp, healthColor, removeTokenTag, TAG_SUGGESTIONS } from '../tokens';
 
 interface TokenPanelProps {
   tokens: Token[];
@@ -91,8 +92,60 @@ export function TokenPanel({ tokens, onPlace, onChange, onRemove }: TokenPanelPr
               onChange={(e) => onChange(token.id, { color: e.target.value })}
             />
           </div>
+
+          <TokenTags token={token} onChange={(patch) => onChange(token.id, patch)} />
         </div>
       ))}
+    </div>
+  );
+}
+
+function TokenTags({ token, onChange }: { token: Token; onChange: (patch: Partial<Token>) => void }) {
+  const [draft, setDraft] = useState('');
+  const tags = token.tags ?? [];
+
+  const add = () => {
+    const next = addTokenTag(tags, draft);
+    if (next !== tags) onChange({ tags: next });
+    setDraft('');
+  };
+
+  return (
+    <div className="token-tags">
+      <div className="token-tag-list">
+        {tags.length === 0 && <span className="token-tags-empty">No tags</span>}
+        {tags.map((tag) => (
+          <span className="token-tag" key={tag}>
+            {tag}
+            <button
+              type="button"
+              aria-label={`Remove ${tag} tag`}
+              onClick={() => onChange({ tags: removeTokenTag(tags, tag) })}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="token-tag-add">
+        <input
+          value={draft}
+          list="token-tag-suggestions"
+          placeholder="add tag"
+          aria-label="New tag"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              add();
+            }
+          }}
+        />
+        <button type="button" onClick={add}>Add</button>
+      </div>
+      <datalist id="token-tag-suggestions">
+        {TAG_SUGGESTIONS.map((tag) => <option key={tag} value={tag} />)}
+      </datalist>
     </div>
   );
 }

@@ -638,6 +638,45 @@ export function MapCanvas({
           const hpSize = Math.max(13, gridSize * 0.24);
           const ratio = healthRatio(token.hp, token.maxHp);
           const draggable = !isPlayerView && toolState?.activeTool === 'token';
+          const tags = token.tags ?? [];
+          const tagFontSize = Math.max(12, gridSize * 0.2);
+          const tagHeight = tagFontSize + 8 / effectiveScale;
+          const shownTags = tags.slice(0, 2).map((tag) => tag.length > 12 ? `${tag.slice(0, 11)}…` : tag);
+          if (tags.length > 2) shownTags.push(`+${tags.length - 2}`);
+          const tagWidths = shownTags.map((tag) => Math.min(barWidth * 1.4, tag.length * tagFontSize * 0.58 + 12));
+          const tagTotalWidth = tagWidths.reduce((sum, width) => sum + width, 0) + Math.max(0, shownTags.length - 1) * 4;
+          const tagY = token.maxHp > 0
+            ? radius + barHeight + 6 / effectiveScale + hpSize + 8 / effectiveScale
+            : radius + 8 / effectiveScale;
+          let tagX = -tagTotalWidth / 2;
+          const tagRects = shownTags.map((tag, index) => {
+            const width = tagWidths[index];
+            const x = tagX;
+            tagX += width + 4;
+            return (
+              <Group key={`${token.id}-tag-${index}`} x={x} y={tagY}>
+                <Rect
+                  width={width}
+                  height={tagHeight}
+                  cornerRadius={tagHeight / 2}
+                  fill={tag.startsWith('+') ? 'rgba(30, 30, 30, 0.75)' : 'rgba(15, 15, 15, 0.86)'}
+                  stroke="rgba(255, 255, 255, 0.35)"
+                  strokeWidth={1 / effectiveScale}
+                  listening={false}
+                />
+                <Text
+                  text={tag}
+                  width={width}
+                  height={tagHeight}
+                  align="center"
+                  verticalAlign="middle"
+                  fontSize={tagFontSize}
+                  fill="#f3f3f3"
+                  listening={false}
+                />
+              </Group>
+            );
+          });
           return (
             <Group
               key={token.id}
@@ -723,6 +762,7 @@ export function MapCanvas({
                   />
                 </>
               )}
+              {tagRects}
             </Group>
           );
         })}
