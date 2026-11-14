@@ -25,6 +25,12 @@ interface ToolbarProps {
   onClearDrawings: () => void;
   onResetFog: () => void;
   onClearFog: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  undoCount: number;
+  redoCount: number;
+  onUndo: () => void;
+  onRedo: () => void;
   showSettings: boolean;
   onToggleSettings: () => void;
 }
@@ -43,6 +49,12 @@ export function Toolbar({
   onClearDrawings,
   onResetFog,
   onClearFog,
+  canUndo,
+  canRedo,
+  undoCount,
+  redoCount,
+  onUndo,
+  onRedo,
   showSettings,
   onToggleSettings,
 }: ToolbarProps) {
@@ -129,6 +141,20 @@ export function Toolbar({
       )}
 
       <div className="toolbar-section">
+        <button
+          onClick={onUndo}
+          disabled={!canUndo}
+          title={`Undo (Ctrl/Cmd+Z) — ${undoCount} step${undoCount === 1 ? '' : 's'}`}
+        >
+          Undo
+        </button>
+        <button
+          onClick={onRedo}
+          disabled={!canRedo}
+          title={`Redo (Ctrl/Cmd+Shift+Z) — ${redoCount} step${redoCount === 1 ? '' : 's'}`}
+        >
+          Redo
+        </button>
         <button onClick={onClearDrawings}>Clear Drawings</button>
         <button onClick={onResetFog}>Reset Fog</button>
         <button onClick={onClearFog}>Clear All Fog</button>

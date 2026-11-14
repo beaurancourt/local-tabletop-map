@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppState, SavedMapState, Token, ToolState } from '../types';
 import type { Identity } from '../network';
 import { uploadAsset } from '../network';
 import { makeToken } from '../tokens';
+import { HistoryManager } from '../history';
+import { recordTokenChange } from '../tokenHistory';
 import { applySavedState, parseSavedMapState } from '../persistence';
 import { buildHexMapMeta, parseHexMapText, renderHexMapSvg } from '../hexmap';
 import { MapCanvas } from '../components/MapCanvas';
@@ -47,7 +49,55 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [tokenFocus, setTokenFocus] = useState<{ id: string; nonce: number } | null>(null);
+  // Local history for this GM tab. Undo/redo never rewinds a local copy: it
+  // computes the next shared state and calls onChange, which sends it down the
+  // same `gm-state` WebSocket channel as every other GM edit.
+  const historyManager = useMemo(() => new HistoryManager(), []);
+  const [, bumpHistory] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const resetTokenHistory = useCallback(() => {
+    historyManager.clear();
+    bumpHistory(n => n + 1);
+  }, [historyManager]);
+
+  const undo = useCallback(() => {
+    const next = historyManager.undo(state);
+    if (!next) return;
+    onChange(next);
+    setSelectedTokenId(prev => next.tokens.some(token => token.id === prev) ? prev : null);
+    bumpHistory(n => n + 1);
+  }, [state, onChange, historyManager]);
+
+  const redo = useCallback(() => {
+    const next = historyManager.redo(state);
+    if (!next) return;
+    onChange(next);
+    setSelectedTokenId(prev => next.tokens.some(token => token.id === prev) ? prev : null);
+    bumpHistory(n => n + 1);
+  }, [state, onChange, historyManager]);
+
+  useEffect(() => {
+    const handleUndoRedo = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      // Leave native text undo alone while a field has focus.
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      }
+      if (e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleUndoRedo);
+    return () => window.removeEventListener('keydown', handleUndoRedo);
+  }, [undo, redo]);
   // Set when a saved state is loaded without its image, so the next image
   // upload fills in the visual without overwriting the restored table state.
   const pendingSavedRef = useRef<SavedMapState | null>(null);
@@ -81,6 +131,7 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
           imageHeight,
         },
       });
+      resetTokenHistory();
       setNotice(
         imageWidth === saved.imageWidth && imageHeight === saved.imageHeight
           ? `Map image loaded and matched to the saved state (${imageWidth}×${imageHeight}).`
@@ -105,6 +156,7 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
         hexmap: null,
       },
     });
+    resetTokenHistory();
     setNotice('Map image loaded.');
   };
 
@@ -134,6 +186,7 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
         hexmap: meta,
       },
     });
+    resetTokenHistory();
     setNotice(`Hex map loaded: ${meta.cols}×${meta.rows} hexes.`);
   };
 
@@ -149,6 +202,7 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
         reuseImage ? state.map.playerImageUrl : null
       )
     );
+    resetTokenHistory();
     setNotice(
       reuseImage
         ? `Saved map state loaded and kept the current ${saved.imageWidth}×${saved.imageHeight} image.`
@@ -179,6 +233,32 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
   };
 
   const changeTokens = (tokens: Token[]) => onChange({ ...state, tokens });
+
+  const recordTokenStep = (before: Token | null, after: Token | null) => {
+    if (recordTokenChange(historyManager, before, after)) bumpHistory(n => n + 1);
+  };
+
+  const placeToken = (gridX: number, gridY: number) => {
+    const token = makeToken(`Token ${state.tokens.length + 1}`, gridX, gridY);
+    changeTokens([...state.tokens, token]);
+    recordTokenStep(null, token);
+  };
+
+  const moveToken = (id: string, gridX: number, gridY: number) => {
+    const before = state.tokens.find((token) => token.id === id);
+    if (!before || (before.gridX === gridX && before.gridY === gridY)) return;
+    const after = { ...before, gridX, gridY };
+    changeTokens(state.tokens.map((token) => token.id === id ? after : token));
+    recordTokenStep(before, after);
+  };
+
+  const removeToken = (id: string) => {
+    const before = state.tokens.find((token) => token.id === id) ?? null;
+    changeTokens(state.tokens.filter((token) => token.id !== id));
+    setSelectedTokenId(prev => prev === id ? null : prev);
+    if (before) recordTokenStep(before, null);
+  };
+
   const setTool = (activeTool: ToolState['activeTool']) => setToolState((prev) => ({ ...prev, activeTool }));
 
   return (
@@ -190,6 +270,20 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
         </button>
         <button className={toolState.activeTool === 'token' ? 'active' : ''} onClick={() => setTool('token')}>Place token</button>
         <button className={toolState.activeTool === 'pan' ? 'active' : ''} onClick={() => setTool('pan')}>Pan</button>
+        <button
+          onClick={undo}
+          disabled={!historyManager.canUndo()}
+          title={`Undo (Ctrl/Cmd+Z) — ${historyManager.getUndoCount()} step${historyManager.getUndoCount() === 1 ? '' : 's'}`}
+        >
+          Undo
+        </button>
+        <button
+          onClick={redo}
+          disabled={!historyManager.canRedo()}
+          title={`Redo (Ctrl/Cmd+Shift+Z) — ${historyManager.getRedoCount()} step${historyManager.getRedoCount() === 1 ? '' : 's'}`}
+        >
+          Redo
+        </button>
         <span className="network-players">At the table: {players.join(', ') || 'no one yet'}</span>
         <input
           ref={fileRef}
@@ -211,12 +305,8 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
               toolState={toolState}
               isPlayerView={false}
               onStateChange={(next) => onChange(next)}
-              onTokenPlace={(gridX, gridY) => {
-                changeTokens([...state.tokens, makeToken(`Token ${state.tokens.length + 1}`, gridX, gridY)]);
-              }}
-              onTokenMove={(id, gridX, gridY) => {
-                changeTokens(state.tokens.map((token) => token.id === id ? { ...token, gridX, gridY } : token));
-              }}
+              onTokenPlace={placeToken}
+              onTokenMove={moveToken}
               selectedTokenId={selectedTokenId}
               onTokenSelect={setSelectedTokenId}
               onTokenOpen={(id) => {
@@ -235,10 +325,8 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
             tokens={state.tokens}
             onPlace={() => setTool('token')}
             onChange={(id, patch) => changeTokens(state.tokens.map((token) => token.id === id ? { ...token, ...patch } : token))}
-            onRemove={(id) => {
-              changeTokens(state.tokens.filter((token) => token.id !== id));
-              setSelectedTokenId(prev => prev === id ? null : prev);
-            }}
+            onRemove={removeToken}
+            onCommit={recordTokenStep}
             selectedId={selectedTokenId}
             onSelect={setSelectedTokenId}
             focusToken={tokenFocus}

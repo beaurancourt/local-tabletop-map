@@ -64,6 +64,21 @@ calibration/framing. That viewport lives only in the player's React component; i
 is not in `AppState`, not sent over the WebSocket, and not broadcast to other
 players. One player moving their view cannot move anyone else's.
 
+## Undo in the browser GM
+
+The browser GM header has **Undo** and **Redo** buttons, plus `Ctrl/Cmd+Z`,
+`Ctrl/Cmd+Shift+Z` and `Ctrl/Cmd+Y`. They use the same `HistoryManager` and
+token operations as the desktop DM. A drag is one step; an HP or name edit is one
+step on blur/Enter, not one per keystroke; token add, remove and tag edits are one
+step each.
+
+Undo is not a local rewind. It computes the previous shared `AppState` and sends
+it through the same `gm-state` WebSocket message as every other GM edit; the
+server validates and broadcasts the resulting state, so every player sees the
+same table. The GM's stack is local to that browser tab and starts empty after a
+reload or reconnect; it records the GM's own actions, not player moves. Undoing a
+token restores that token's stored value and leaves other tokens alone.
+
 ## Authority and identity
 
 The server owns the state (`server/data/state.json` and uploaded media in
@@ -140,6 +155,8 @@ used: this is a LAN feature.
   and zoomed into the map, with the local **Fit** and **GM view** controls.
 - `screenshots/token-drag-pan-mode.png` — a token mid-drag in the browser GM while
   the **Pan** tool is active; the selected row is highlighted in the Tokens panel.
+- `screenshots/token-undo-redo.png` — the browser GM after undoing an HP edit, with
+  both Undo and Redo live in the header.
 
 The deployed GM key lives in `server.env` on pop (`chmod 600`), not in this
 repository; use it in the GM join form. The LAN firewall on pop allows TCP 8092

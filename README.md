@@ -39,6 +39,7 @@ The player view is a clean, distraction-free window designed for display on a TV
 - **Text Tool**: Drop movable text labels on the map (GM-only; not shown to players)
 - **Laser Pointer**: Temporarily highlight areas (visible to players in real-time)
 - **Tokens**: Place combatants on the map with names, current/max HP, stable ids, an owner field, WoW-style green/yellow/red health bars and free-text tags with condition suggestions. Press a token on the map to select it and open its editor, whatever tool is active; drag it onto another cell to move it. The `K` token tool still places a new token when you click empty map, and an empty-map drag pans instead.
+- **Undo / Redo**: `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` or `Ctrl/Cmd+Y`, plus the toolbar buttons. Token add, remove, drag, HP/name/owner/colour edits and tag changes are undoable; a drag and a typed field edit are each one step. The same 100-step history covers drawings, fog and text labels. In the browser GM, undo is sent through the shared table state so every player follows it.
 - **Initiative Tracker**: Roll and order combatants; a persistent party roster carries across sessions, and the order can be shown to players
 - **Pan & Zoom**: Navigate large maps easily
 - **Player Viewport Indicator**: See exactly what players can see (green dashed rectangle)

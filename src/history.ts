@@ -1,4 +1,4 @@
-import { AppState, FogState, BlockState, Drawing, TextLabel } from './types';
+import { AppState, FogState, BlockState, Drawing, TextLabel, Token } from './types';
 
 // Base interface for undoable operations
 export interface Operation {
@@ -132,6 +132,48 @@ export function createTextLabelChangeOperation(
     },
     unapply(state: AppState): AppState {
       return { ...state, textLabels: setLabel(state.textLabels, this.before) };
+    },
+  };
+}
+
+// A token added, moved, edited, or removed.
+// before=null → add; after=null → remove; both set → edit.
+// The whole token is stored on each side, so a move, an HP edit, a colour
+// change and a tag change are all the same operation. Replacing by id keeps
+// the token in place in the array and leaves other tokens untouched.
+export interface TokenChangeOperation extends Operation {
+  type: 'tokenChange';
+  id: string;
+  before: Token | null;
+  after: Token | null;
+}
+
+export function createTokenChangeOperation(
+  before: Token | null,
+  after: Token | null
+): TokenChangeOperation {
+  const id = after?.id ?? before?.id;
+  if (!id) throw new Error('a token change needs a token on at least one side');
+
+  const setToken = (tokens: Token[], token: Token | null): Token[] => {
+    const index = tokens.findIndex((candidate) => candidate.id === id);
+    if (index === -1) return token ? [...tokens, token] : tokens;
+    if (!token) return tokens.filter((candidate) => candidate.id !== id);
+    const next = [...tokens];
+    next[index] = token;
+    return next;
+  };
+
+  return {
+    type: 'tokenChange',
+    id,
+    before,
+    after,
+    apply(state: AppState): AppState {
+      return { ...state, tokens: setToken(state.tokens, this.after) };
+    },
+    unapply(state: AppState): AppState {
+      return { ...state, tokens: setToken(state.tokens, this.before) };
     },
   };
 }

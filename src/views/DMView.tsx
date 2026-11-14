@@ -14,6 +14,7 @@ import { createDefaultState, createDefaultToolState, initializeFog, syncState, o
 import { saveMapState, loadMapState, applySavedState, saveInitiative, loadInitiative } from '../persistence';
 import { createEntities, rerollAll, createDrawSteelGroup, createDrawSteelCharacter, startNewRound } from '../initiative';
 import { makeToken } from '../tokens';
+import { recordTokenChange } from '../tokenHistory';
 import { loadCartographerBundle, bundleSrcToObjectUrl } from '../cartographer';
 import { loadHexMapFile, buildHexMapMeta, renderHexMapSvg, buildHexLookup, describeHex, type HexMapMeta, type HexCellData } from '../hexmap';
 import {
@@ -90,6 +91,7 @@ export function DMView() {
     const newState = historyManager.undo(state);
     if (newState) {
       setState(newState);
+      setSelectedTokenId(prev => newState.tokens.some(token => token.id === prev) ? prev : null);
       forceUpdate(n => n + 1);
     }
   }, [state, historyManager]);
@@ -99,6 +101,7 @@ export function DMView() {
     const newState = historyManager.redo(state);
     if (newState) {
       setState(newState);
+      setSelectedTokenId(prev => newState.tokens.some(token => token.id === prev) ? prev : null);
       forceUpdate(n => n + 1);
     }
   }, [state, historyManager]);
@@ -106,7 +109,13 @@ export function DMView() {
   // Keyboard handler for undo/redo
   useEffect(() => {
     const handleUndoRedo = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      // Leave native text undo alone while a field has focus.
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
           redo();
@@ -114,7 +123,7 @@ export function DMView() {
           undo();
         }
       }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      if (e.key.toLowerCase() === 'y') {
         e.preventDefault();
         redo();
       }
@@ -735,20 +744,29 @@ export function DMView() {
     forceUpdate(n => n + 1);
   }, [historyManager]);
 
-  // Token handlers
+  // Token handlers. A drag fires one onTokenMove; field edits commit once on
+  // blur/Enter (see TokenPanel); add/remove/tag edits are discrete steps.
+  const recordTokenStep = useCallback((before: Token | null, after: Token | null) => {
+    if (recordTokenChange(historyManager, before, after)) forceUpdate(n => n + 1);
+  }, [historyManager]);
+
   const handleTokenPlace = useCallback((gridX: number, gridY: number) => {
-    setState(prev => ({
-      ...prev,
-      tokens: [...prev.tokens, makeToken(`Token ${prev.tokens.length + 1}`, gridX, gridY)],
-    }));
-  }, []);
+    const token = makeToken(`Token ${state.tokens.length + 1}`, gridX, gridY);
+    setState(prev => ({ ...prev, tokens: [...prev.tokens, token] }));
+    recordTokenStep(null, token);
+  }, [state.tokens.length, recordTokenStep]);
 
   const handleTokenMove = useCallback((id: string, gridX: number, gridY: number) => {
+    const before = state.tokens.find(token => token.id === id);
+    if (!before) return;
+    if (before.gridX === gridX && before.gridY === gridY) return;
+    const after = { ...before, gridX, gridY };
     setState(prev => ({
       ...prev,
-      tokens: prev.tokens.map(token => token.id === id ? { ...token, gridX, gridY } : token),
+      tokens: prev.tokens.map(token => token.id === id ? after : token),
     }));
-  }, []);
+    recordTokenStep(before, after);
+  }, [state.tokens, recordTokenStep]);
 
   const handleTokenChange = useCallback((id: string, patch: Partial<Token>) => {
     setState(prev => ({
@@ -757,10 +775,16 @@ export function DMView() {
     }));
   }, []);
 
+  const handleTokenCommit = useCallback((before: Token, after: Token) => {
+    recordTokenStep(before, after);
+  }, [recordTokenStep]);
+
   const handleTokenRemove = useCallback((id: string) => {
+    const before = state.tokens.find(token => token.id === id) ?? null;
     setState(prev => ({ ...prev, tokens: prev.tokens.filter(token => token.id !== id) }));
     setSelectedTokenId(prev => prev === id ? null : prev);
-  }, []);
+    if (before) recordTokenStep(before, null);
+  }, [state.tokens, recordTokenStep]);
 
   const handleTokenSelect = useCallback((id: string) => {
     setSelectedTokenId(id);
@@ -1195,6 +1219,12 @@ export function DMView() {
         onClearDrawings={handleClearDrawings}
         onResetFog={handleResetFog}
         onClearFog={handleClearFog}
+        canUndo={historyManager.canUndo()}
+        canRedo={historyManager.canRedo()}
+        undoCount={historyManager.getUndoCount()}
+        redoCount={historyManager.getRedoCount()}
+        onUndo={undo}
+        onRedo={redo}
         showSettings={showSettings}
         onToggleSettings={() => setShowSettings(!showSettings)}
       />
@@ -1264,6 +1294,7 @@ export function DMView() {
               onPlace={handlePlaceToken}
               onChange={handleTokenChange}
               onRemove={handleTokenRemove}
+              onCommit={handleTokenCommit}
               selectedId={selectedTokenId}
               onSelect={setSelectedTokenId}
               focusToken={tokenFocus}

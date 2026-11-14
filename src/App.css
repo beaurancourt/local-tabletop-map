@@ -147,6 +147,12 @@ html, body, #root {
   border-color: var(--sage);
 }
 
+.toolbar button:disabled,
+.network-gm-bar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .toolbar input[type="range"] {
   width: 80px;
   accent-color: var(--brass);

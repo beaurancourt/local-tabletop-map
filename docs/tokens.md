@@ -53,6 +53,42 @@ editor directly. The touch path uses the same precedence: a press on a token is
 left to Konva's token drag, while empty-map drags and two-finger pinches pan and
 zoom the player's local view.
 
+**Undo and redo.** Token changes use the same command pattern as fog, drawings
+and text labels (`src/history.ts`): `createTokenChangeOperation(before, after)`
+stores the whole token on each side, where `before=null` is an add and
+`after=null` is a remove. `recordTokenChange` pushes it onto the existing
+`HistoryManager`, so token and non-token operations interleave in one 100-step
+stack instead of a second history mechanism.
+
+- **One drag is one step.** `MapCanvas` calls `onTokenMove` once on drag end, not
+  per pointer move. Dropping a token back on its own cell records nothing.
+- **One field edit is one step on commit.** Typing updates the live state on
+  every keystroke, but `TokenEditSession` snapshots the token on focus and
+  records one operation on blur or Enter. A no-op focus records nothing.
+- **Discrete actions are one step each.** Add token, remove token, and each tag
+  add/remove are single operations. Name, HP, max HP, owner and colour are
+  field-commit steps. Because the whole token is stored, every token field is
+  covered.
+- **Depth is 100**, shared with the other undoable operations in the DM and with
+  the browser GM's own operations. Loading a new map clears the stack. The stack
+  is in memory: reconnecting, refreshing or opening a new tab starts empty.
+- **The browser GM's undo is a shared-state replay.** Undo computes the next
+  `AppState` from the GM's local stack, then calls the same `onChange` used by
+  every other GM edit. That sends a normal `gm-state` message over the WebSocket
+  and the server broadcasts the resulting state to every player. There is no
+  local-only rewind and no separate "undo" event; players simply receive the
+  re-applied table state. The GM's history covers GM actions, not player moves.
+  Undoing a token restores that whole token, so a later edit by another client
+  to the same token is overwritten by that undo; other tokens are untouched.
+- **Controls.** Both the DM toolbar and the browser GM header have Undo and Redo
+  buttons with live step counts. `Ctrl/Cmd+Z` undoes, `Ctrl/Cmd+Shift+Z` and
+  `Ctrl/Cmd+Y` redo. While an input is focused, the app leaves the browser's
+  native text undo alone.
+- **Tests.** `src/tokenHistory.test.ts` covers add/move/edit/remove operations,
+  other tokens surviving, undo/redo through `HistoryManager`, the 100-step
+  depth, field coalescing (many HP keystrokes → one step), separate fields,
+  tag steps and no-op commits.
+
 ## Use
 
 In the DM window, open **Show Settings → Tokens**, press **Place token**, then

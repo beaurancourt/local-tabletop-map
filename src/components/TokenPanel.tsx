@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Token } from '../types';
 import { addTokenTag, clampHp, healthColor, removeTokenTag, TAG_SUGGESTIONS } from '../tokens';
+import { TokenEditSession } from '../tokenHistory';
 
 interface TokenPanelProps {
   tokens: Token[];
   onPlace: () => void;
   onChange: (id: string, patch: Partial<Token>) => void;
   onRemove: (id: string) => void;
+  /** One history step when a field edit is committed (blur/Enter). */
+  onCommit?: (before: Token, after: Token) => void;
   /** Token selected on the map; the matching row is highlighted and scrolled to. */
   selectedId?: string | null;
   onSelect?: (id: string) => void;
@@ -19,11 +22,29 @@ export function TokenPanel({
   onPlace,
   onChange,
   onRemove,
+  onCommit,
   selectedId = null,
   onSelect,
   focusToken = null,
 }: TokenPanelProps) {
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  // Live typing updates the parent on every keystroke; the edit session turns
+  // the whole field edit into one history operation when it commits.
+  const editSession = useRef(new TokenEditSession());
+  const tokensRef = useRef(tokens);
+  tokensRef.current = tokens;
+
+  const commitFieldEdit = () => {
+    const id = editSession.current.activeId;
+    if (!id) return;
+    const current = tokensRef.current.find((candidate) => candidate.id === id) ?? null;
+    const operation = editSession.current.commit(current);
+    if (operation?.before && operation.after) onCommit?.(operation.before, operation.after);
+  };
+
+  const beginFieldEdit = (token: Token, field: string) => {
+    editSession.current.begin(token, field);
+  };
 
   useEffect(() => {
     if (!selectedId) return;
@@ -78,6 +99,11 @@ export function TokenPanel({
               value={token.name}
               aria-label="Token name"
               onChange={(e) => onChange(token.id, { name: e.target.value })}
+              onFocus={() => beginFieldEdit(token, 'name')}
+              onBlur={commitFieldEdit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
             />
             <button className="token-remove" onClick={() => onRemove(token.id)} aria-label="Remove token">
               ×
@@ -94,6 +120,11 @@ export function TokenPanel({
                 value={token.hp}
                 disabled={token.maxHp <= 0}
                 onChange={(e) => onChange(token.id, { hp: clampHp(Number(e.target.value), token.maxHp) })}
+                onFocus={() => beginFieldEdit(token, 'hp')}
+                onBlur={commitFieldEdit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                }}
               />
             </label>
             <span className="token-slash">/</span>
@@ -106,6 +137,11 @@ export function TokenPanel({
                 onChange={(e) => {
                   const maxHp = Math.max(0, Math.round(Number(e.target.value) || 0));
                   onChange(token.id, { maxHp, hp: clampHp(token.hp, maxHp) });
+                }}
+                onFocus={() => beginFieldEdit(token, 'maxHp')}
+                onBlur={commitFieldEdit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
                 }}
               />
             </label>
@@ -123,6 +159,11 @@ export function TokenPanel({
                 value={token.owner ?? ''}
                 placeholder="unowned"
                 onChange={(e) => onChange(token.id, { owner: e.target.value.trim() || null })}
+                onFocus={() => beginFieldEdit(token, 'owner')}
+                onBlur={commitFieldEdit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                }}
               />
             </label>
             <input
@@ -131,23 +172,44 @@ export function TokenPanel({
               value={token.color}
               aria-label="Token colour"
               onChange={(e) => onChange(token.id, { color: e.target.value })}
+              onFocus={() => beginFieldEdit(token, 'color')}
+              onBlur={commitFieldEdit}
             />
           </div>
 
-          <TokenTags token={token} onChange={(patch) => onChange(token.id, patch)} />
+          <TokenTags
+            token={token}
+            onChange={(patch) => onChange(token.id, patch)}
+            onCommit={(before, after) => onCommit?.(before, after)}
+          />
         </div>
       ))}
     </div>
   );
 }
 
-function TokenTags({ token, onChange }: { token: Token; onChange: (patch: Partial<Token>) => void }) {
+function TokenTags({
+  token,
+  onChange,
+  onCommit,
+}: {
+  token: Token;
+  onChange: (patch: Partial<Token>) => void;
+  onCommit?: (before: Token, after: Token) => void;
+}) {
   const [draft, setDraft] = useState('');
   const tags = token.tags ?? [];
 
+  // A tag add/remove is a discrete action, so unlike typing it is one history
+  // step immediately.
+  const commitPatch = (patch: Partial<Token>) => {
+    onChange(patch);
+    onCommit?.(token, { ...token, ...patch });
+  };
+
   const add = () => {
     const next = addTokenTag(tags, draft);
-    if (next !== tags) onChange({ tags: next });
+    if (next !== tags) commitPatch({ tags: next });
     setDraft('');
   };
 
@@ -161,7 +223,7 @@ function TokenTags({ token, onChange }: { token: Token; onChange: (patch: Partia
             <button
               type="button"
               aria-label={`Remove ${tag} tag`}
-              onClick={() => onChange({ tags: removeTokenTag(tags, tag) })}
+              onClick={() => commitPatch({ tags: removeTokenTag(tags, tag) })}
             >
               ×
             </button>
