@@ -1207,6 +1207,17 @@ html, body, #root {
   font-size: 12px;
 }
 
+.network-notice {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--brass) 45%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--brass) 12%, transparent);
+  color: var(--parchment);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .network-note {
   margin: 14px 0 0;
   color: var(--faint);

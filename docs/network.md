@@ -28,6 +28,29 @@ The browser GM surface handles the map, tokens, names, HP and tags. Fog, drawing
 text labels and the initiative tracker remain in the Tauri DM window; they are not
 part of the browser control surface yet.
 
+## Loading a map
+
+**Load map** accepts map images (`image/*`), a saved map state (`.json`) and a
+hex map (`.hexm`).
+
+- **Image:** uploaded to the server; its natural size becomes the map size.
+- **Saved map state:** applied immediately and broadcast. A saved state stores
+  only the image's original local `filePath` and its dimensions, never the image
+  bytes, and a browser cannot read the GM laptop's disk. So the state is accepted
+  without its image: the grid, fog, drawings, blocks, labels, view and tokens
+  arrive, and the GM loads the matching image next. That image fills in the
+  visual without replacing the restored state. If the session already serves an
+  image with exactly the saved dimensions, it is reused instead. Refusing the
+  state would throw away work the browser can actually use; silently pairing it
+  with an arbitrary image would misalign the grid.
+- **Hex map:** the `.hexm` metadata is validated and rendered to two SVGs (GM
+  with hex labels, players without), both uploaded to `/media`. The map keeps the
+  hex geometry and per-hex links, and the square grid is hidden.
+
+Only a genuine `SavedMapState` is accepted as `.json`; any other JSON is rejected
+with a readable message and the current table is left untouched. A cartographer
+"both views" bundle (also `.json`) is not supported in the browser yet.
+
 ## Authority and identity
 
 The server owns the state (`server/data/state.json` and uploaded media in

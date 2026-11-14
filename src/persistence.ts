@@ -147,11 +147,41 @@ export async function loadInitiative(): Promise<SavedInitiativeState | null> {
   }
 }
 
+/** Strict parser for a browser/desktop .json saved map. The image itself is
+ * not stored in SavedMapState; only its dimensions and the local filePath are. */
+export function parseSavedMapState(text: string): SavedMapState {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new Error('Not valid JSON (expected a saved map state)');
+  }
+  const saved = value as Partial<SavedMapState> | null;
+  const object = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
+  const number = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  if (
+    !saved ||
+    typeof saved.filePath !== 'string' ||
+    !number(saved.imageWidth) || !number(saved.imageHeight) ||
+    !number(saved.gridSize) || typeof saved.gridVisible !== 'boolean' ||
+    typeof saved.gridColor !== 'string' || !number(saved.gridOpacity) ||
+    !number(saved.gridOffsetX) || !number(saved.gridOffsetY) ||
+    !object(saved.fog) || !Array.isArray((saved.fog as SavedMapState['fog']).cells) ||
+    !Array.isArray(saved.drawings) || !object(saved.blocks) || !Array.isArray(saved.textLabels ?? []) ||
+    !object(saved.view) || !object(saved.playerViewOffset) || !object(saved.calibration) ||
+    (saved.tokens !== undefined && !Array.isArray(saved.tokens)) ||
+    typeof saved.savedAt !== 'string'
+  ) {
+    throw new Error('Not a VTT saved map state (expected the .json exported with a map)');
+  }
+  return saved as SavedMapState;
+}
+
 // Apply saved state to app state (keeping the new imageUrl)
 export function applySavedState(
   currentState: AppState,
   savedState: SavedMapState,
-  imageUrl: string,
+  imageUrl: string | null,
   playerImageUrl: string | null = null
 ): AppState {
   return {

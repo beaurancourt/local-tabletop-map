@@ -82,8 +82,7 @@ function isHexMapFile(v: unknown): v is HexMapFile {
 
 // Read + validate a `.hexm` file. Throws on malformed input (matching
 // `loadCartographerBundle`) so problems surface instead of failing silently.
-export async function loadHexMapFile(path: string): Promise<HexMapFile> {
-  const text = new TextDecoder().decode(await readFile(path));
+export function parseHexMapText(text: string): HexMapFile {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -94,6 +93,10 @@ export async function loadHexMapFile(path: string): Promise<HexMapFile> {
     throw new Error('Not a vtt-hexmap file (need format/cols/rows/terrains/hexes)');
   }
   return parsed;
+}
+
+export async function loadHexMapFile(path: string): Promise<HexMapFile> {
+  return parseHexMapText(new TextDecoder().decode(await readFile(path)));
 }
 
 // --- Geometry ---------------------------------------------------------------
