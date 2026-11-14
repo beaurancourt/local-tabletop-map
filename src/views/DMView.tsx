@@ -8,10 +8,12 @@ import { GridSettings } from '../components/GridSettings';
 import { CalibrationSettings } from '../components/CalibrationSettings';
 import { InitiativeTracker } from '../components/InitiativeTracker';
 import { BundleCreator } from '../components/BundleCreator';
-import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing, TextLabel, InitiativeMode } from '../types';
+import { TokenPanel } from '../components/TokenPanel';
+import { AppState, ToolState, PlayerViewport, FogState, BlockState, Drawing, TextLabel, InitiativeMode, Token } from '../types';
 import { createDefaultState, createDefaultToolState, initializeFog, syncState, onViewportSync, onStateRequest } from '../store';
 import { saveMapState, loadMapState, applySavedState, saveInitiative, loadInitiative } from '../persistence';
 import { createEntities, rerollAll, createDrawSteelGroup, createDrawSteelCharacter, startNewRound } from '../initiative';
+import { makeToken } from '../tokens';
 import { loadCartographerBundle, bundleSrcToObjectUrl } from '../cartographer';
 import { loadHexMapFile, buildHexMapMeta, renderHexMapSvg, buildHexLookup, describeHex, type HexMapMeta, type HexCellData } from '../hexmap';
 import {
@@ -329,6 +331,10 @@ export function DMView() {
           case 't': // (t)ext
             e.preventDefault();
             setToolState(prev => ({ ...prev, activeTool: 'text' }));
+            return;
+          case 'k': // to(k)en
+            e.preventDefault();
+            setToolState(prev => ({ ...prev, activeTool: 'token' }));
             return;
           case 'p': // (p)an — back to pan/select (also opens hex links on .hexm maps)
             e.preventDefault();
@@ -724,6 +730,36 @@ export function DMView() {
     historyManager.push(operation);
     forceUpdate(n => n + 1);
   }, [historyManager]);
+
+  // Token handlers
+  const handleTokenPlace = useCallback((gridX: number, gridY: number) => {
+    setState(prev => ({
+      ...prev,
+      tokens: [...prev.tokens, makeToken(`Token ${prev.tokens.length + 1}`, gridX, gridY)],
+    }));
+  }, []);
+
+  const handleTokenMove = useCallback((id: string, gridX: number, gridY: number) => {
+    setState(prev => ({
+      ...prev,
+      tokens: prev.tokens.map(token => token.id === id ? { ...token, gridX, gridY } : token),
+    }));
+  }, []);
+
+  const handleTokenChange = useCallback((id: string, patch: Partial<Token>) => {
+    setState(prev => ({
+      ...prev,
+      tokens: prev.tokens.map(token => token.id === id ? { ...token, ...patch } : token),
+    }));
+  }, []);
+
+  const handleTokenRemove = useCallback((id: string) => {
+    setState(prev => ({ ...prev, tokens: prev.tokens.filter(token => token.id !== id) }));
+  }, []);
+
+  const handlePlaceToken = useCallback(() => {
+    setToolState(prev => ({ ...prev, activeTool: 'token' }));
+  }, []);
 
   // State handlers
   const handleStateChange = (newState: AppState) => {
@@ -1179,6 +1215,8 @@ export function DMView() {
             onBlockOperationStart={handleBlockOperationStart}
             onBlockOperationEnd={handleBlockOperationEnd}
             onTextLabelCommit={handleTextLabelCommit}
+            onTokenPlace={handleTokenPlace}
+            onTokenMove={handleTokenMove}
             width={showSettings ? windowSize.width - 300 : windowSize.width}
             height={windowSize.height}
             playerViewport={playerViewport}
@@ -1201,6 +1239,12 @@ export function DMView() {
               onPixelsPerInchChange={handlePixelsPerInchChange}
               onSaveCalibration={handleSaveCalibration}
               onResetCalibration={handleResetCalibration}
+            />
+            <TokenPanel
+              tokens={state.tokens}
+              onPlace={handlePlaceToken}
+              onChange={handleTokenChange}
+              onRemove={handleTokenRemove}
             />
           </div>
         )}

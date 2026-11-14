@@ -29,6 +29,7 @@ export const createDefaultState = (): AppState => ({
   drawings: [],
   blocks: { cells: {} },
   textLabels: [],
+  tokens: [],
   laserPoints: [],
   laserColor: '#ff0000', // Default red
   view: {

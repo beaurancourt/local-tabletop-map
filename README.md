@@ -24,6 +24,7 @@ The player view is a clean, distraction-free window designed for display on a TV
 - **Block Tool**: Paint solid colored grid cells (walls, hazards, zones) — dimmed on the DM view, solid for players
 - **Text Tool**: Drop movable text labels on the map (GM-only; not shown to players)
 - **Laser Pointer**: Temporarily highlight areas (visible to players in real-time)
+- **Tokens**: Place combatants on the map with names, current/max HP, stable ids, an owner field and WoW-style green/yellow/red health bars (DM edits them under Show Settings → Tokens; the `K` token tool places and drags them)
 - **Initiative Tracker**: Roll and order combatants; a persistent party roster carries across sessions, and the order can be shown to players
 - **Pan & Zoom**: Navigate large maps easily
 - **Player Viewport Indicator**: See exactly what players can see (green dashed rectangle)
@@ -34,8 +35,10 @@ The player view is a clean, distraction-free window designed for display on a TV
 - **Instant Load**: Renders the current map as soon as the window opens, centered on the map
 
 ### Persistence
-- Map state (fog, drawings, blocks, text labels, grid settings, calibration) is automatically saved
+- Map state (fog, drawings, blocks, text labels, tokens, grid settings, calibration) is automatically saved
 - Reopen a map and pick up exactly where you left off
+
+Tokens are documented in [docs/tokens.md](docs/tokens.md), with a TV-scale screenshot at `screenshots/tokens-tv.png`.
 
 ### Combined GM / Player Maps (`.json`)
 

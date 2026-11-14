@@ -1,10 +1,11 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { Stage, Layer, Image, Line, Rect, Group, Label, Tag, Text } from 'react-konva';
+import { Stage, Layer, Image, Line, Rect, Circle, Group, Label, Tag, Text } from 'react-konva';
 import Konva from 'konva';
-import { AppState, ToolState, Drawing, DrawingPoint, PlayerViewport, TextLabel } from '../types';
+import { AppState, ToolState, Drawing, DrawingPoint, PlayerViewport, TextLabel, Token } from '../types';
 import { modifyFog, modifyBlocks } from '../store';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { hexAtPoint, linkForHex } from '../hexmap';
+import { healthColor, healthRatio, tokenCenter, cellForPoint } from '../tokens';
 
 interface MapCanvasProps {
   state: AppState;
@@ -17,6 +18,8 @@ interface MapCanvasProps {
   onBlockOperationStart?: () => void; // Called when block operation starts
   onBlockOperationEnd?: () => void; // Called when block operation ends
   onTextLabelCommit?: (id: string, before: TextLabel | null, after: TextLabel | null) => void; // Text label add/edit/remove (for history)
+  onTokenPlace?: (gridX: number, gridY: number) => void;
+  onTokenMove?: (id: string, gridX: number, gridY: number) => void;
   width: number;
   height: number;
   playerViewport?: PlayerViewport | null;
@@ -34,6 +37,8 @@ export function MapCanvas({
   onBlockOperationStart,
   onBlockOperationEnd,
   onTextLabelCommit,
+  onTokenPlace,
+  onTokenMove,
   width,
   height,
   playerViewport,
@@ -307,6 +312,18 @@ export function MapCanvas({
     const pos = getGridPosition(stage);
     if (!pos) return;
 
+    if (toolState.activeTool === 'token') {
+      // Clicking a token must not place another one underneath it.
+      const target = e.target;
+      const parent = target.getParent();
+      const onToken =
+        target.name() === 'token' ||
+        !!(parent && parent.name?.() === 'token');
+      if (onToken) return;
+      onTokenPlace?.(pos.gridX, pos.gridY);
+      return;
+    }
+
     if (toolState.activeTool === 'text') {
       // Existing labels handle themselves: a click edits, a drag moves (see the
       // Label's onClick/onDragEnd). Only a click on empty space creates a new one.
@@ -352,7 +369,7 @@ export function MapCanvas({
     } else if (toolState.activeTool === 'pan') {
       // Pan is handled by drag
     }
-  }, [isPlayerView, onStateChange, onFogOperationStart, toolState, state, getGridPosition]);
+  }, [isPlayerView, onStateChange, onFogOperationStart, onTokenPlace, toolState, state, getGridPosition]);
 
   // Click a hex on a `.hexm` map (DM view, pan tool) to open its key — e.g.
   // an `obsidian://` link to the hex-key note. A pan drag does not fire click,
@@ -608,6 +625,107 @@ export function MapCanvas({
             />
           </>
         )}
+
+        {/* Tokens: a cell-anchored body with a name above and a WoW-style health
+            bar below. Both windows see them; only the DM can drag/place. */}
+        {state.tokens.map((token: Token) => {
+          const gridSize = state.map.gridSize || 50;
+          const center = tokenCenter(token, gridSize, state.map.gridOffsetX, state.map.gridOffsetY);
+          const radius = gridSize * 0.38;
+          const barWidth = gridSize * 1.7;
+          const barHeight = Math.max(8, gridSize * 0.16);
+          const nameSize = Math.max(18, gridSize * 0.36);
+          const hpSize = Math.max(13, gridSize * 0.24);
+          const ratio = healthRatio(token.hp, token.maxHp);
+          const draggable = !isPlayerView && toolState?.activeTool === 'token';
+          return (
+            <Group
+              key={token.id}
+              name="token"
+              x={center.x}
+              y={center.y}
+              draggable={draggable}
+              onDragEnd={(e) => {
+                e.cancelBubble = true;
+                const cell = cellForPoint(
+                  e.target.x(),
+                  e.target.y(),
+                  gridSize,
+                  latestStateRef.current.map.gridOffsetX,
+                  latestStateRef.current.map.gridOffsetY
+                );
+                onTokenMove?.(token.id, cell.gridX, cell.gridY);
+              }}
+              onMouseEnter={(e) => {
+                if (draggable) e.target.getStage()!.container().style.cursor = 'move';
+              }}
+              onMouseLeave={(e) => {
+                if (draggable) e.target.getStage()!.container().style.cursor = 'default';
+              }}
+            >
+              <Circle
+                radius={radius}
+                fill={token.color}
+                stroke={token.hp === 0 && token.maxHp > 0 ? '#ef4444' : '#111111'}
+                strokeWidth={Math.max(2, gridSize * 0.05) / effectiveScale}
+                shadowColor="#000000"
+                shadowBlur={gridSize * 0.08 / effectiveScale}
+                shadowOpacity={0.55}
+              />
+              <Text
+                text={token.name || 'Token'}
+                x={-barWidth / 2}
+                y={-radius - nameSize - 4 / effectiveScale}
+                width={barWidth}
+                align="center"
+                fontSize={nameSize}
+                fontStyle="bold"
+                fill={token.hp === 0 && token.maxHp > 0 ? '#fecaca' : '#ffffff'}
+                stroke="#000000"
+                strokeWidth={Math.max(2, nameSize * 0.18) / effectiveScale}
+                fillAfterStrokeEnabled
+                listening={false}
+              />
+              {token.maxHp > 0 && (
+                <>
+                  <Rect
+                    x={-barWidth / 2}
+                    y={radius + 4 / effectiveScale}
+                    width={barWidth}
+                    height={barHeight}
+                    cornerRadius={barHeight / 2}
+                    fill="rgba(0, 0, 0, 0.72)"
+                    stroke="#000000"
+                    strokeWidth={1 / effectiveScale}
+                    listening={false}
+                  />
+                  <Rect
+                    x={-barWidth / 2 + 1 / effectiveScale}
+                    y={radius + 5 / effectiveScale}
+                    width={Math.max(0, (barWidth - 2 / effectiveScale) * ratio)}
+                    height={Math.max(1, barHeight - 2 / effectiveScale)}
+                    cornerRadius={barHeight / 2}
+                    fill={healthColor(token.hp, token.maxHp)}
+                    listening={false}
+                  />
+                  <Text
+                    text={`${token.hp}/${token.maxHp}`}
+                    x={-barWidth / 2}
+                    y={radius + barHeight + 6 / effectiveScale}
+                    width={barWidth}
+                    align="center"
+                    fontSize={hpSize}
+                    fill="#ffffff"
+                    stroke="#000000"
+                    strokeWidth={Math.max(2, hpSize * 0.2) / effectiveScale}
+                    fillAfterStrokeEnabled
+                    listening={false}
+                  />
+                </>
+              )}
+            </Group>
+          );
+        })}
 
         {/* Fog of War (rendered as single canvas for performance) */}
         {fogCanvas && (

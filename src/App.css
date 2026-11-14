@@ -910,3 +910,148 @@ html, body, #root {
   color: var(--sage-hi);
   margin-bottom: 8px;
 }
+
+/* Token panel (DM settings sidebar) */
+.token-panel {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--edge-soft);
+}
+
+.token-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.token-panel-head h3 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.token-panel-head button {
+  width: auto;
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.token-panel-hint,
+.token-panel-empty {
+  margin: 0 0 10px;
+  color: var(--faint);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.token-row {
+  margin-bottom: 9px;
+  padding: 7px;
+  border: 1px solid var(--edge-soft);
+  border-radius: 5px;
+  background: var(--ink);
+}
+
+.token-row-main,
+.token-row-fields,
+.token-row-owner {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.token-row-main {
+  margin-bottom: 5px;
+}
+
+.token-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.token-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 5px;
+  font-size: 12px;
+}
+
+.token-remove {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.token-remove:hover {
+  color: #ef4444;
+  background: transparent;
+}
+
+.token-row-fields {
+  margin-bottom: 5px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.token-row-fields label,
+.token-row-owner label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+
+.token-row-fields input {
+  width: 48px;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.token-slash {
+  color: var(--faint);
+}
+
+.token-health-chip {
+  width: 18px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: 4px;
+}
+
+.token-row-owner {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.token-row-owner label {
+  flex: 1 1 auto;
+}
+
+.token-row-owner input[type="text"],
+.token-row-owner input:not([type]) {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.token-color {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 20px;
+  padding: 0;
+}

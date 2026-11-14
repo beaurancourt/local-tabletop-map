@@ -63,6 +63,21 @@ export interface TextLabel {
   fontSize: number; // in map pixels (scales with the map)
 }
 
+export interface Token {
+  /** Stable across edits, saves and the future network layer. */
+  id: string;
+  name: string;
+  /** Reserved for the networking card; null means unowned/DM-controlled. */
+  owner: string | null;
+  /** Position is the grid cell, not a free pixel; the token renders at its centre. */
+  gridX: number;
+  gridY: number;
+  hp: number;
+  /** 0 means HP is unset: no health bar is drawn. */
+  maxHp: number;
+  color: string;
+}
+
 export interface ViewState {
   scale: number;
   offsetX: number;
@@ -135,6 +150,7 @@ export interface AppState {
   drawings: Drawing[];
   blocks: BlockState;
   textLabels: TextLabel[]; // Text annotations placed on the map
+  tokens: Token[]; // Placed combatants (synced to player view)
   laserPoints: DrawingPoint[]; // Temporary laser pointer (synced to player view, cleared on release)
   laserColor: string; // Laser color (synced to player view)
   view: ViewState;
@@ -158,13 +174,14 @@ export interface SavedMapState {
   drawings: Drawing[];
   blocks: BlockState;
   textLabels?: TextLabel[]; // Optional for backwards compatibility with older saves
+  tokens?: Token[]; // Optional for backwards compatibility with older saves
   view: ViewState;
   playerViewOffset: PlayerViewOffset;
   calibration: CalibrationState;
   savedAt: string; // ISO timestamp
 }
 
-export type Tool = 'pan' | 'fogReveal' | 'fogHide' | 'draw' | 'laser' | 'block' | 'text';
+export type Tool = 'pan' | 'fogReveal' | 'fogHide' | 'draw' | 'laser' | 'block' | 'text' | 'token';
 
 export interface ToolState {
   activeTool: Tool;

@@ -8,6 +8,7 @@ const TOOL_NAMES: Record<string, string> = {
   laser: 'Laser (R)',
   block: 'Block (B)',
   text: 'Text (T)',
+  token: 'Token (K)',
 };
 
 interface ToolbarProps {
