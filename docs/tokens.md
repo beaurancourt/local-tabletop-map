@@ -35,6 +35,26 @@ means "unset": no bar is drawn and the token is neutral grey. HP is clamped to
 sized in map pixels so it scales with the map, and the name/number text uses a
 heavy outline for legibility over any map.
 
+**Fog and hit testing.** The fog canvas is an Image drawn above the tokens.
+Konva hit-tests an Image as its full rectangle regardless of transparent pixels,
+so a listening fog image swallowed every token press on a map with any fog; the
+press fell through to the draggable map layer and panned instead of grabbing the
+token. The fog image is now `listening={false}`. It stays above the tokens
+visually, so unrevealed tokens remain hidden, but presses reach the token or the
+map beneath. This was invisible on fog-free test maps, and it affected the DM
+and browser player as well as the browser GM.
+
+**Rendering cost.** Each token is a group of Konva nodes (body, name, health
+bar, HP text, tag pills). The body's soft shadow originally used Konva's
+perfect-draw path, which allocates a buffer per shadowed, stroked shape on every
+draw. That path made a 30-token map take ~100 ms per drag frame even though only
+the dragged token moved. Setting `perfectDrawEnabled={false}` on the token body
+keeps the same shadow and brings the same 30-token drag to ~17 ms. A layer split
+was measured too; it made empty-map panning cheaper but did not fix the token
+drag, so the extra layer and its fog-order complexity were not kept. The
+regression guard is the frame measurement in the card, not a unit test: the cost
+is in the canvas draw, which vitest does not exercise.
+
 **DM versus players.** Players see the token body, name, health bar and numbers.
 A player can press their own token to select it and drag it; the matching HP row
 in the HUD highlights. The DM and browser GM additionally get the token panel

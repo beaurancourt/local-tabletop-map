@@ -882,6 +882,10 @@ export function MapCanvas({
             ? Boolean(canMoveToken?.(token))
             : Boolean(onTokenMove);
           const selected = selectedTokenId === token.id;
+          // The fog image is non-listening (see below), so a token hidden by
+          // opaque player fog must not be grabbable through it either.
+          const fogged = state.fog.cells[token.gridY]?.[token.gridX] === true;
+          const hiddenByPlayerFog = isPlayerView && fogged;
           const tags = token.tags ?? [];
           const tagFontSize = Math.max(12, gridSize * 0.2);
           const tagHeight = tagFontSize + 8 / effectiveScale;
@@ -928,7 +932,8 @@ export function MapCanvas({
               name="token"
               x={center.x}
               y={center.y}
-              draggable={draggable}
+              draggable={draggable && !hiddenByPlayerFog}
+              listening={!hiddenByPlayerFog}
               onClick={(e) => {
                 // Keep a token click from reaching the Stage (and placing a
                 // token or opening a hex link underneath it).
@@ -983,6 +988,10 @@ export function MapCanvas({
                 shadowColor="#000000"
                 shadowBlur={gridSize * 0.08 / effectiveScale}
                 shadowOpacity={0.55}
+                // Konva's perfect-draw path allocates a buffer per shadowed,
+                // stroked shape. With 30 tokens that made every drag frame take
+                // ~100 ms; turning it off keeps the same shadow at ~17 ms.
+                perfectDrawEnabled={false}
               />
               <Text
                 text={token.name || 'Token'}
@@ -1040,12 +1049,17 @@ export function MapCanvas({
           );
         })}
 
-        {/* Fog of War (rendered as single canvas for performance) */}
+        {/* Fog of War (rendered as single canvas for performance). Konva hit-
+            tests an Image as its full rectangle, so a listening fog image above
+            the tokens swallowed every token press (the map then panned). It is
+            purely visual: an empty/fogged press must reach the draggable layer
+            below, and tokens stay reachable through fog. */}
         {fogCanvas && (
           <Image
             ref={fogImageRef}
             image={fogCanvas}
             opacity={isPlayerView ? 1 : 0.5}
+            listening={false}
           />
         )}
 
