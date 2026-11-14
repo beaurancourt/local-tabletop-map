@@ -23,6 +23,15 @@ export function NetworkPlayerView({ identity, state, players, onMove, onHp }: Pr
   const [viewMode, setViewMode] = useState<ViewMode>('fit');
   const [localView, setLocalView] = useState<ViewState | null>(null);
   const previousSize = useRef(size);
+  // Selecting a token on the map highlights and focuses its HP row in the HUD.
+  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [tokenFocus, setTokenFocus] = useState<{ id: string; nonce: number } | null>(null);
+  const hpRefs = useRef<Map<string, HTMLLabelElement>>(new Map());
+
+  useEffect(() => {
+    if (!tokenFocus) return;
+    hpRefs.current.get(tokenFocus.id)?.querySelector<HTMLInputElement>('input')?.focus();
+  }, [tokenFocus]);
 
   useEffect(() => {
     const resize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
@@ -90,6 +99,12 @@ export function NetworkPlayerView({ identity, state, players, onMove, onHp }: Pr
           onLocalViewChange={useView}
           canMoveToken={(token) => token.owner === identity.name}
           onTokenMove={onMove}
+          selectedTokenId={selectedTokenId}
+          onTokenSelect={setSelectedTokenId}
+          onTokenOpen={(id) => {
+            setSelectedTokenId(id);
+            setTokenFocus(prev => ({ id, nonce: (prev?.nonce ?? 0) + 1 }));
+          }}
         />
       </div>
       <div className="network-player-hud">
@@ -97,7 +112,17 @@ export function NetworkPlayerView({ identity, state, players, onMove, onHp }: Pr
         <span className="network-players">{players.join(', ')}</span>
         {mine.length === 0 && <span className="network-hint">No tokens assigned to you yet.</span>}
         {mine.map((token: Token) => (
-          <label key={token.id} className="network-hp">
+          <label
+            key={token.id}
+            className={`network-hp${selectedTokenId === token.id ? ' selected' : ''}`}
+            data-token-id={token.id}
+            data-selected={selectedTokenId === token.id ? 'true' : undefined}
+            ref={(el) => {
+              if (el) hpRefs.current.set(token.id, el);
+              else hpRefs.current.delete(token.id);
+            }}
+            onClick={() => setSelectedTokenId(token.id)}
+          >
             {token.name}
             <input
               type="number"

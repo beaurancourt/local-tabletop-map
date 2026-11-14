@@ -42,6 +42,10 @@ export function DMView() {
   const [toolState, setToolState] = useState<ToolState>(createDefaultToolState);
   const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
   const [showSettings, setShowSettings] = useState(false);
+  // Selecting a token on the map opens the existing inspector in the settings
+  // sidebar; double-click also focuses the name field.
+  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [tokenFocus, setTokenFocus] = useState<{ id: string; nonce: number } | null>(null);
   const [showBundleCreator, setShowBundleCreator] = useState(false);
   const [playerViewport, setPlayerViewport] = useState<PlayerViewport | null>(null);
   // `.hexm` hover tooltip: per-hex data (not synced — DM-only) + hovered hex.
@@ -755,6 +759,18 @@ export function DMView() {
 
   const handleTokenRemove = useCallback((id: string) => {
     setState(prev => ({ ...prev, tokens: prev.tokens.filter(token => token.id !== id) }));
+    setSelectedTokenId(prev => prev === id ? null : prev);
+  }, []);
+
+  const handleTokenSelect = useCallback((id: string) => {
+    setSelectedTokenId(id);
+    setShowSettings(true);
+  }, []);
+
+  const handleTokenOpen = useCallback((id: string) => {
+    setSelectedTokenId(id);
+    setShowSettings(true);
+    setTokenFocus(prev => ({ id, nonce: (prev?.nonce ?? 0) + 1 }));
   }, []);
 
   const handlePlaceToken = useCallback(() => {
@@ -1217,6 +1233,9 @@ export function DMView() {
             onTextLabelCommit={handleTextLabelCommit}
             onTokenPlace={handleTokenPlace}
             onTokenMove={handleTokenMove}
+            selectedTokenId={selectedTokenId}
+            onTokenSelect={handleTokenSelect}
+            onTokenOpen={handleTokenOpen}
             width={showSettings ? windowSize.width - 300 : windowSize.width}
             height={windowSize.height}
             playerViewport={playerViewport}
@@ -1245,6 +1264,9 @@ export function DMView() {
               onPlace={handlePlaceToken}
               onChange={handleTokenChange}
               onRemove={handleTokenRemove}
+              selectedId={selectedTokenId}
+              onSelect={setSelectedTokenId}
+              focusToken={tokenFocus}
             />
           </div>
         )}

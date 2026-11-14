@@ -36,16 +36,30 @@ sized in map pixels so it scales with the map, and the name/number text uses a
 heavy outline for legibility over any map.
 
 **DM versus players.** Players see the token body, name, health bar and numbers.
-The DM additionally gets the token panel (place, name, HP, max, owner, colour,
-remove), can drag tokens, and sees the edit fields. There is no hidden information
-in the token layer yet; that is a networking/visibility card.
+A player can press their own token to select it and drag it; the matching HP row
+in the HUD highlights. The DM and browser GM additionally get the token panel
+(place, name, HP, max, owner, colour, remove), can press any token to select and
+drag it, and see the edit fields. There is no hidden information in the token
+layer yet; that is a networking/visibility card.
+
+**Interaction precedence.** A pointer press on a token always belongs to the
+token, whatever tool is selected. The active tool only changes what an empty-map
+press does: `pan` and `token` drag the map, and the token tool places a token on
+the click that ends a drag-free press. This is one rule in `MapCanvas`, so the
+desktop DM, browser GM and browser player behave alike. Selecting a token opens
+its existing editor — the settings sidebar on the DM, the Tokens panel in the
+browser GM, and the HP row in the player HUD — and a double-click focuses that
+editor directly. The touch path uses the same precedence: a press on a token is
+left to Konva's token drag, while empty-map drags and two-finger pinches pan and
+zoom the player's local view.
 
 ## Use
 
 In the DM window, open **Show Settings → Tokens**, press **Place token**, then
 click a map cell. The token tool is also bound to `K`. The panel edits the token
-list; dragging a token with the token tool moves it to another cell. Tokens are
-saved with the map.
+list. Press a token on the map to select it and open its editor, whatever tool is
+active; drag it onto another cell to move it. A drag on empty map pans instead of
+placing. Tokens are saved with the map.
 
 ## Tests
 

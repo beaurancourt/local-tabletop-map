@@ -23,6 +23,13 @@ Then open `http://pop.local:8092/` (or the machine's LAN address):
 - A player can drag only their own tokens and edit only their current HP. The GM
   can do both to every token. The server validates the owner and the HP bounds; a
   player cannot change someone else's token by sending an intent.
+- The pointer rule is the same in the desktop DM, the browser GM and the browser
+  player: pressing a token always selects it (and, where permitted, drags it);
+  pressing empty map pans. The active tool only changes what an empty-map click
+  does — the token tool places a token, and the painting tools draw. Selecting a
+  token opens its editor: the settings sidebar on the DM, the Tokens panel on the
+  browser GM, and the matching HP row in the player HUD. Double-click focuses the
+  editor directly.
 
 The browser GM surface handles the map, tokens, names, HP and tags. Fog, drawings,
 text labels and the initiative tracker remain in the Tauri DM window; they are not
@@ -131,6 +138,8 @@ used: this is a LAN feature.
   token to a new cell and setting HP to 12; the GM state reflects the same token.
 - `screenshots/network-player-pan-zoom.png` — a phone-sized player browser panned
   and zoomed into the map, with the local **Fit** and **GM view** controls.
+- `screenshots/token-drag-pan-mode.png` — a token mid-drag in the browser GM while
+  the **Pan** tool is active; the selected row is highlighted in the Tokens panel.
 
 The deployed GM key lives in `server.env` on pop (`chmod 600`), not in this
 repository; use it in the GM join form. The LAN firewall on pop allows TCP 8092

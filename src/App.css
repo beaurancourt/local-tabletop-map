@@ -958,6 +958,13 @@ html, body, #root {
   background: var(--ink);
 }
 
+/* The token selected on the map. */
+.token-row.selected {
+  border-color: var(--brass);
+  box-shadow: inset 3px 0 0 var(--brass);
+  background: var(--raised);
+}
+
 .token-row-main,
 .token-row-fields,
 .token-row-owner {
@@ -1339,6 +1346,15 @@ html, body, #root {
   align-items: center;
   gap: 4px;
   color: var(--dim);
+}
+
+/* The player's selected token, mirrored from the map. */
+.network-hp.selected {
+  color: var(--parchment);
+}
+
+.network-hp.selected input {
+  border-color: var(--brass);
 }
 
 .network-view-controls {

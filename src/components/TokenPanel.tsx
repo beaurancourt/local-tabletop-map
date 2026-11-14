@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Token } from '../types';
 import { addTokenTag, clampHp, healthColor, removeTokenTag, TAG_SUGGESTIONS } from '../tokens';
 
@@ -7,9 +7,37 @@ interface TokenPanelProps {
   onPlace: () => void;
   onChange: (id: string, patch: Partial<Token>) => void;
   onRemove: (id: string) => void;
+  /** Token selected on the map; the matching row is highlighted and scrolled to. */
+  selectedId?: string | null;
+  onSelect?: (id: string) => void;
+  /** A double-click on the map asks the panel to focus this token's name field. */
+  focusToken?: { id: string; nonce: number } | null;
 }
 
-export function TokenPanel({ tokens, onPlace, onChange, onRemove }: TokenPanelProps) {
+export function TokenPanel({
+  tokens,
+  onPlace,
+  onChange,
+  onRemove,
+  selectedId = null,
+  onSelect,
+  focusToken = null,
+}: TokenPanelProps) {
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    if (!selectedId) return;
+    rowRefs.current.get(selectedId)?.scrollIntoView({ block: 'nearest' });
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!focusToken) return;
+    const row = rowRefs.current.get(focusToken.id);
+    if (!row) return;
+    row.scrollIntoView({ block: 'nearest' });
+    row.querySelector<HTMLInputElement>('input.token-name')?.focus();
+  }, [focusToken]);
+
   return (
     <div className="token-panel">
       <div className="token-panel-head">
@@ -17,15 +45,28 @@ export function TokenPanel({ tokens, onPlace, onChange, onRemove }: TokenPanelPr
         <button onClick={onPlace}>Place token</button>
       </div>
       <p className="token-panel-hint">
-        Click the map to place. Tokens are grid cells, not free pixels; drag one onto another cell
-        to move it. Both windows see the name and HP bar. The owner is reserved for the network
-        layer.
+        Click the map to place. Tokens are grid cells, not free pixels; press a token on the map to
+        select and edit it, whatever tool is active. Both windows see the name and HP bar. The owner
+        is reserved for the network layer.
       </p>
 
       {tokens.length === 0 && <p className="token-panel-empty">No tokens placed.</p>}
 
       {tokens.map((token) => (
-        <div className="token-row" key={token.id} title={`id: ${token.id}`}>
+        <div
+          className={`token-row${selectedId === token.id ? ' selected' : ''}`}
+          key={token.id}
+          title={`id: ${token.id}`}
+          data-token-id={token.id}
+          data-selected={selectedId === token.id ? 'true' : undefined}
+          aria-current={selectedId === token.id ? 'true' : undefined}
+          ref={(el) => {
+            if (el) rowRefs.current.set(token.id, el);
+            else rowRefs.current.delete(token.id);
+          }}
+          onClick={() => onSelect?.(token.id)}
+          onFocusCapture={() => onSelect?.(token.id)}
+        >
           <div className="token-row-main">
             <span
               className="token-swatch"

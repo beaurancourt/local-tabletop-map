@@ -8,6 +8,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { hexAtPoint, linkForHex } from '../hexmap';
 import { healthColor, healthRatio, tokenCenter, cellForPoint } from '../tokens';
 import { fitView, gmPlayerView, panView, pinchView, zoomView } from '../viewport';
+import { emptyMapPans, mapPress } from '../tokenInteraction';
 
 interface MapCanvasProps {
   state: AppState;
@@ -23,6 +24,12 @@ interface MapCanvasProps {
   onTokenPlace?: (gridX: number, gridY: number) => void;
   onTokenMove?: (id: string, gridX: number, gridY: number) => void;
   canMoveToken?: (token: Token) => boolean;
+  // Selection/inspection is owned by the view: the DM opens the settings
+  // sidebar, the browser GM highlights its token panel, and the player focuses
+  // the matching HP row in the HUD.
+  selectedTokenId?: string | null;
+  onTokenSelect?: (id: string) => void;
+  onTokenOpen?: (id: string) => void; // double-click/tap: open the editor directly
   width: number;
   height: number;
   playerViewport?: PlayerViewport | null;
@@ -58,6 +65,9 @@ export function MapCanvas({
   onTokenPlace,
   onTokenMove,
   canMoveToken,
+  selectedTokenId = null,
+  onTokenSelect,
+  onTokenOpen,
   width,
   height,
   playerViewport,
@@ -103,6 +113,8 @@ export function MapCanvas({
   playerViewRef.current = playerView;
   const pointerGestureRef = useRef<PlayerGesture | null>(null);
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  // A pan drag with the token tool must not also drop a token when it ends.
+  const layerDragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
   // Persistent fog canvas for incremental updates
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -274,8 +286,8 @@ export function MapCanvas({
   }, [state, isPlayerView, onStateChange, onLocalViewChange, fit.scale, playerScale, width, height]);
 
   // Browser-player gestures: one pointer pans, two pinch, double-tap fits.
-  // A draggable token is left to Konva, so dragging your own token still moves
-  // the token rather than the view.
+  // A press on a token belongs to the token: the player's own token drags, and
+  // anyone else's token is still selected instead of starting a pan.
   const stagePointFromEvent = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const stage = stageRef.current;
     if (!stage) return null;
@@ -283,21 +295,27 @@ export function MapCanvas({
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }, []);
 
-  const draggableTokenAt = useCallback((point: { x: number; y: number }) => {
+  const tokenNodeAt = useCallback((point: { x: number; y: number }) => {
     const stage = stageRef.current;
-    if (!stage) return false;
+    if (!stage) return null;
     let node: Konva.Node | null = stage.getIntersection(point);
     while (node && node !== stage) {
-      if (node.name() === 'token') return node.draggable();
+      if (node.name() === 'token') return node;
       node = node.getParent();
     }
-    return false;
+    return null;
   }, []);
 
   const handlePlayerPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (!localPlayer || !onLocalViewChange) return;
     const point = stagePointFromEvent(event);
-    if (!point || draggableTokenAt(point)) return;
+    if (!point) return;
+    const tokenNode = tokenNodeAt(point);
+    if (tokenNode) {
+      const id = tokenNode.id();
+      if (id) onTokenSelect?.(id);
+      return;
+    }
 
     let gesture = pointerGestureRef.current;
     if (!gesture) {
@@ -336,7 +354,7 @@ export function MapCanvas({
       /* the browser may have already released it */
     }
     event.preventDefault();
-  }, [draggableTokenAt, localPlayer, onLocalViewChange, stagePointFromEvent]);
+  }, [localPlayer, onLocalViewChange, onTokenSelect, stagePointFromEvent, tokenNodeAt]);
 
   const handlePlayerPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const gesture = pointerGestureRef.current;
@@ -484,6 +502,15 @@ export function MapCanvas({
     return () => window.clearTimeout(id);
   }, [editingId]);
 
+  const isTokenTarget = useCallback((target: Konva.Node) => {
+    let node: Konva.Node | null = target;
+    while (node) {
+      if (node.name() === 'token') return true;
+      node = node.getParent();
+    }
+    return false;
+  }, []);
+
   // Handle mouse down
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (isPlayerView || !onStateChange || !toolState) return;
@@ -491,20 +518,20 @@ export function MapCanvas({
     const stage = stageRef.current;
     if (!stage) return;
 
+    // Clear the previous press's pan marker; a real drag re-creates it below.
+    layerDragRef.current = null;
+
+    // A token press belongs to the token, whatever the tool. The token group is
+    // draggable, and painting must not start underneath the drag.
+    const press = mapPress({
+      onToken: isTokenTarget(e.target),
+      activeTool: toolState.activeTool,
+      dragged: false,
+    });
+    if (press !== 'tool') return;
+
     const pos = getGridPosition(stage);
     if (!pos) return;
-
-    if (toolState.activeTool === 'token') {
-      // Clicking a token must not place another one underneath it.
-      const target = e.target;
-      const parent = target.getParent();
-      const onToken =
-        target.name() === 'token' ||
-        !!(parent && parent.name?.() === 'token');
-      if (onToken) return;
-      onTokenPlace?.(pos.gridX, pos.gridY);
-      return;
-    }
 
     if (toolState.activeTool === 'text') {
       // Existing labels handle themselves: a click edits, a drag moves (see the
@@ -548,27 +575,37 @@ export function MapCanvas({
       onBlockOperationStart?.();
       const newBlocks = modifyBlocks(state.blocks, pos.gridX, pos.gridY, toolState.brushSize, toolState.blockColor);
       onStateChange({ ...state, blocks: newBlocks });
-    } else if (toolState.activeTool === 'pan') {
-      // Pan is handled by drag
     }
-  }, [isPlayerView, onStateChange, onFogOperationStart, onTokenPlace, toolState, state, getGridPosition]);
+  }, [isPlayerView, onStateChange, onFogOperationStart, onTokenPlace, toolState, state, getGridPosition, isTokenTarget]);
 
-  // Click a hex on a `.hexm` map (DM view, pan tool) to open its key — e.g.
-  // an `obsidian://` link to the hex-key note. A pan drag does not fire click,
-  // so this only triggers on a genuine tap.
-  const handleStageClick = useCallback(() => {
+  // A genuine click (not the release of a pan drag) on empty map: the token
+  // tool places a token, and the pan tool opens a `.hexm` hex link.
+  const handleStageClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (isPlayerView || !toolState) return;
-    const meta = state.map.hexmap;
-    if (!meta || toolState.activeTool !== 'pan') return;
+
+    const drag = layerDragRef.current;
+    layerDragRef.current = null;
+    if (drag?.moved) return;
+    if (isTokenTarget(e.target)) return;
+
     const stage = stageRef.current;
     if (!stage) return;
     const pos = getGridPosition(stage);
     if (!pos) return;
+
+    if (toolState.activeTool === 'token') {
+      onTokenPlace?.(pos.gridX, pos.gridY);
+      return;
+    }
+    if (toolState.activeTool !== 'pan') return;
+
+    const meta = state.map.hexmap;
+    if (!meta) return;
     const hex = hexAtPoint(meta, pos.x, pos.y);
     if (!hex) return;
     const url = linkForHex(meta, hex.col, hex.row);
     if (url) openUrl(url).catch(err => console.error('Failed to open hex link:', err));
-  }, [isPlayerView, toolState, state.map.hexmap, getGridPosition]);
+  }, [isPlayerView, toolState, state.map.hexmap, getGridPosition, isTokenTarget, onTokenPlace]);
 
   // Handle mouse move
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -596,7 +633,7 @@ export function MapCanvas({
     const pos = getGridPosition(stage);
     if (!pos) return;
 
-    if (toolState.activeTool === 'fogReveal' || toolState.activeTool === 'fogHide') {
+    if ((toolState.activeTool === 'fogReveal' || toolState.activeTool === 'fogHide') && isFogging) {
       const reveal = toolState.activeTool === 'fogReveal';
       const newFog = modifyFog(state.fog, pos.gridX, pos.gridY, toolState.brushSize, reveal);
       onStateChange({ ...state, fog: newFog });
@@ -612,7 +649,7 @@ export function MapCanvas({
       const newBlocks = modifyBlocks(latestStateRef.current.blocks, pos.gridX, pos.gridY, toolState.brushSize, toolState.blockColor);
       onStateChange({ ...latestStateRef.current, blocks: newBlocks });
     }
-  }, [isPlayerView, onStateChange, toolState, state, getGridPosition, isDrawing, isBlocking, onHexHover]);
+  }, [isPlayerView, onStateChange, toolState, state, getGridPosition, isDrawing, isFogging, isBlocking, onHexHover]);
 
   // Handle mouse up
   const handleMouseUp = useCallback(() => {
@@ -648,6 +685,22 @@ export function MapCanvas({
   }, [isDrawing, isFogging, isBlocking, currentDrawing, onStateChange, onFogOperationEnd, onBlockOperationEnd, onDrawingAdded, toolState]);
 
   // Handle drag for panning
+  const handleLayerDragStart = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+    if (isPlayerView) return;
+    // Drag events bubble: only track the Layer's own pan drag, not a token.
+    if (e.target !== e.currentTarget) return;
+    layerDragRef.current = { x: e.target.x(), y: e.target.y(), moved: false };
+  }, [isPlayerView]);
+
+  const handleLayerDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+    if (e.target !== e.currentTarget) return;
+    const drag = layerDragRef.current;
+    if (!drag || drag.moved) return;
+    if (Math.abs(e.target.x() - drag.x) > 2 || Math.abs(e.target.y() - drag.y) > 2) {
+      drag.moved = true;
+    }
+  }, []);
+
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     if (isPlayerView || !onStateChange) return;
     // Drag events bubble: only handle the Layer's own pan drag, not a child
@@ -705,7 +758,9 @@ export function MapCanvas({
         y={effectiveOffset.y}
         scaleX={effectiveScale}
         scaleY={effectiveScale}
-        draggable={!isPlayerView && toolState?.activeTool === 'pan'}
+        draggable={!isPlayerView && Boolean(toolState && emptyMapPans(toolState.activeTool))}
+        onDragStart={handleLayerDragStart}
+        onDragMove={handleLayerDragMove}
         onDragEnd={handleDragEnd}
       >
         {/* Map Image */}
@@ -820,9 +875,13 @@ export function MapCanvas({
           const nameSize = Math.max(18, gridSize * 0.36);
           const hpSize = Math.max(13, gridSize * 0.24);
           const ratio = healthRatio(token.hp, token.maxHp);
+          // A token is always draggable by someone allowed to move it: the DM
+          // and browser GM can move every token, a player only their own. The
+          // active tool no longer gates this.
           const draggable = isPlayerView
             ? Boolean(canMoveToken?.(token))
-            : toolState?.activeTool === 'token';
+            : Boolean(onTokenMove);
+          const selected = selectedTokenId === token.id;
           const tags = token.tags ?? [];
           const tagFontSize = Math.max(12, gridSize * 0.2);
           const tagHeight = tagFontSize + 8 / effectiveScale;
@@ -865,10 +924,29 @@ export function MapCanvas({
           return (
             <Group
               key={token.id}
+              id={token.id}
               name="token"
               x={center.x}
               y={center.y}
               draggable={draggable}
+              onClick={(e) => {
+                // Keep a token click from reaching the Stage (and placing a
+                // token or opening a hex link underneath it).
+                e.cancelBubble = true;
+                onTokenSelect?.(token.id);
+              }}
+              onTap={(e) => {
+                e.cancelBubble = true;
+                onTokenSelect?.(token.id);
+              }}
+              onDblClick={(e) => {
+                e.cancelBubble = true;
+                (onTokenOpen ?? onTokenSelect)?.(token.id);
+              }}
+              onDblTap={(e) => {
+                e.cancelBubble = true;
+                (onTokenOpen ?? onTokenSelect)?.(token.id);
+              }}
               onDragEnd={(e) => {
                 e.cancelBubble = true;
                 const cell = cellForPoint(
@@ -881,12 +959,22 @@ export function MapCanvas({
                 onTokenMove?.(token.id, cell.gridX, cell.gridY);
               }}
               onMouseEnter={(e) => {
-                if (draggable) e.target.getStage()!.container().style.cursor = 'move';
+                const cursor = draggable ? 'move' : onTokenSelect ? 'pointer' : 'default';
+                e.target.getStage()!.container().style.cursor = cursor;
               }}
               onMouseLeave={(e) => {
-                if (draggable) e.target.getStage()!.container().style.cursor = 'default';
+                e.target.getStage()!.container().style.cursor = 'default';
               }}
             >
+              {selected && (
+                <Circle
+                  radius={radius + Math.max(3, gridSize * 0.09) / effectiveScale}
+                  stroke="#e8c06a"
+                  strokeWidth={Math.max(3, gridSize * 0.06) / effectiveScale}
+                  dash={[Math.max(6, gridSize * 0.16) / effectiveScale, Math.max(4, gridSize * 0.1) / effectiveScale]}
+                  listening={false}
+                />
+              )}
               <Circle
                 radius={radius}
                 fill={token.color}

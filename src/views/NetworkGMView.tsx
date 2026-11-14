@@ -45,6 +45,8 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [tokenFocus, setTokenFocus] = useState<{ id: string; nonce: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // Set when a saved state is loaded without its image, so the next image
   // upload fills in the visual without overwriting the restored table state.
@@ -215,6 +217,12 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
               onTokenMove={(id, gridX, gridY) => {
                 changeTokens(state.tokens.map((token) => token.id === id ? { ...token, gridX, gridY } : token));
               }}
+              selectedTokenId={selectedTokenId}
+              onTokenSelect={setSelectedTokenId}
+              onTokenOpen={(id) => {
+                setSelectedTokenId(id);
+                setTokenFocus(prev => ({ id, nonce: (prev?.nonce ?? 0) + 1 }));
+              }}
               width={size.width - 330}
               height={size.height - 56}
             />
@@ -227,7 +235,13 @@ export function NetworkGMView({ identity, server, state, players, onChange }: Pr
             tokens={state.tokens}
             onPlace={() => setTool('token')}
             onChange={(id, patch) => changeTokens(state.tokens.map((token) => token.id === id ? { ...token, ...patch } : token))}
-            onRemove={(id) => changeTokens(state.tokens.filter((token) => token.id !== id))}
+            onRemove={(id) => {
+              changeTokens(state.tokens.filter((token) => token.id !== id));
+              setSelectedTokenId(prev => prev === id ? null : prev);
+            }}
+            selectedId={selectedTokenId}
+            onSelect={setSelectedTokenId}
+            focusToken={tokenFocus}
           />
           {notice && <p className="network-notice">{notice}</p>}
           {error && <p className="network-error">{error}</p>}
