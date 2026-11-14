@@ -10,6 +10,12 @@ as `http://pop.local:8092`; see [docs/network.md](docs/network.md) for identity,
 authority, deployment, the GM key and the HTTPS/PWA option. The desktop Tauri DM
 remains the full offline application.
 
+Each browser player also has their own view of the map: drag to pan, wheel or
+pinch to zoom, double-tap (or **Fit**) to fit the whole map, and **GM view** to
+jump to the GM's framing. The viewport is local to that browser and is never
+sent to the server or to the other players. See
+`screenshots/network-player-pan-zoom.png`.
+
 ## Screenshots
 
 ### GM View

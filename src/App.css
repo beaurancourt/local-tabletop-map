@@ -1341,6 +1341,39 @@ html, body, #root {
   color: var(--dim);
 }
 
+.network-view-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding-left: 6px;
+  border-left: 1px solid var(--edge);
+}
+
+.network-view-controls button {
+  width: auto;
+  min-width: 30px;
+  padding: 3px 7px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--parchment);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.network-view-controls button[aria-pressed="true"] {
+  border-color: var(--brass);
+  background: var(--brass);
+  color: #17130d;
+}
+
+@media (max-width: 560px) {
+  .network-view-controls {
+    border-left: 0;
+    padding-left: 0;
+  }
+}
+
 .network-hp input {
   width: 54px;
   padding: 2px 4px;

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import type { AppState, Token } from '../types';
+import { useEffect, useRef, useState } from 'react';
+import type { AppState, Token, ViewState } from '../types';
 import type { Identity } from '../network';
 import { MapCanvas } from '../components/MapCanvas';
 import { InitiativeTracker } from '../components/InitiativeTracker';
 import { clampHp } from '../tokens';
+import { fitView, gmPlayerView, recenterView, zoomView } from '../viewport';
 
 interface Props {
   identity: Identity;
@@ -13,8 +14,15 @@ interface Props {
   onHp: (id: string, hp: number) => void;
 }
 
+type ViewMode = 'fit' | 'gm' | 'local';
+
 export function NetworkPlayerView({ identity, state, players, onMove, onHp }: Props) {
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  // The viewport is deliberately component-local: it is never put into
+  // AppState, never sent to the server, and never broadcast to another player.
+  const [viewMode, setViewMode] = useState<ViewMode>('fit');
+  const [localView, setLocalView] = useState<ViewState | null>(null);
+  const previousSize = useRef(size);
 
   useEffect(() => {
     const resize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
@@ -22,6 +30,51 @@ export function NetworkPlayerView({ identity, state, players, onMove, onHp }: Pr
     window.addEventListener('resize', resize);
     return () => window.removeEventListener('resize', resize);
   }, []);
+
+  // A new map starts fitted to this player's screen. A reconnect remounts this
+  // component, so it also starts fitted; the view is not persisted.
+  const mapKey = state.map.filePath || state.map.imageUrl ||
+    `${state.map.imageWidth}x${state.map.imageHeight}:${state.map.gridSize}`;
+  useEffect(() => {
+    setViewMode('fit');
+    setLocalView(null);
+  }, [mapKey]);
+
+  // Rotating a phone or resizing the window keeps the same map point under the
+  // centre for a view the player has panned/zoomed; fit and GM views recompute
+  // themselves from the new size / calibration.
+  useEffect(() => {
+    const previous = previousSize.current;
+    if (previous.width !== size.width || previous.height !== size.height) {
+      if (viewMode === 'local') {
+        setLocalView((view) => view ? recenterView(view, previous, size) : view);
+      }
+      previousSize.current = size;
+    }
+  }, [size, viewMode]);
+
+  const fit = fitView(state.map.imageWidth, state.map.imageHeight, size.width, size.height);
+  const gm = gmPlayerView(
+    state.calibration.pixelsPerInch,
+    state.map.gridSize || 50,
+    state.playerViewOffset,
+  );
+  const view = viewMode === 'gm' ? gm : viewMode === 'local' && localView ? localView : fit;
+  const centre = { x: size.width / 2, y: size.height / 2 };
+
+  const useView = (next: ViewState) => {
+    setLocalView(next);
+    setViewMode('local');
+  };
+  const zoomBy = (factor: number) => useView(zoomView(view, factor, centre, fit.scale, gm.scale));
+  const fitToScreen = () => {
+    setLocalView(null);
+    setViewMode('fit');
+  };
+  const useGmFraming = () => {
+    setLocalView(null);
+    setViewMode('gm');
+  };
 
   const mine = state.tokens.filter((token) => token.owner === identity.name);
 
@@ -33,6 +86,8 @@ export function NetworkPlayerView({ identity, state, players, onMove, onHp }: Pr
           isPlayerView={true}
           width={size.width}
           height={size.height}
+          localView={view}
+          onLocalViewChange={useView}
           canMoveToken={(token) => token.owner === identity.name}
           onTokenMove={onMove}
         />
@@ -55,6 +110,28 @@ export function NetworkPlayerView({ identity, state, players, onMove, onHp }: Pr
             <span>/ {token.maxHp || '—'}</span>
           </label>
         ))}
+        <div className="network-view-controls" role="group" aria-label="Map view">
+          <button type="button" onClick={() => zoomBy(1 / 1.25)} aria-label="Zoom out" title="Zoom out">−</button>
+          <button type="button" onClick={() => zoomBy(1.25)} aria-label="Zoom in" title="Zoom in">+</button>
+          <button
+            type="button"
+            onClick={fitToScreen}
+            aria-pressed={viewMode === 'fit'}
+            aria-label="Fit the whole map"
+            title="Fit the whole map"
+          >
+            Fit
+          </button>
+          <button
+            type="button"
+            onClick={useGmFraming}
+            aria-pressed={viewMode === 'gm'}
+            aria-label="Use the GM's framing"
+            title="Use the GM's framing"
+          >
+            GM view
+          </button>
+        </div>
       </div>
       <InitiativeTracker initiative={state.initiative} editable={false} />
     </div>

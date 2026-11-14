@@ -1,11 +1,13 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { Stage, Layer, Image, Line, Rect, Circle, Group, Label, Tag, Text } from 'react-konva';
 import Konva from 'konva';
-import { AppState, ToolState, Drawing, DrawingPoint, PlayerViewport, TextLabel, Token } from '../types';
+import { AppState, ToolState, Drawing, DrawingPoint, PlayerViewport, TextLabel, Token, ViewState } from '../types';
 import { modifyFog, modifyBlocks } from '../store';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { hexAtPoint, linkForHex } from '../hexmap';
 import { healthColor, healthRatio, tokenCenter, cellForPoint } from '../tokens';
+import { fitView, gmPlayerView, panView, pinchView, zoomView } from '../viewport';
 
 interface MapCanvasProps {
   state: AppState;
@@ -25,6 +27,21 @@ interface MapCanvasProps {
   height: number;
   playerViewport?: PlayerViewport | null;
   onHexHover?: (hex: { col: number; row: number } | null) => void; // .hexm hover (DM)
+  // Browser players own their view. The Tauri player window does not pass these,
+  // so it keeps the DM-controlled calibration/playerViewOffset framing.
+  localView?: ViewState | null;
+  onLocalViewChange?: (view: ViewState) => void;
+}
+
+interface PlayerGesture {
+  pointers: Map<number, { x: number; y: number }>;
+  startView: ViewState;
+  startPoint: { x: number; y: number };
+  startDistance: number;
+  startMid: { x: number; y: number };
+  moved: boolean;
+  pinched: boolean;
+  startTime: number;
 }
 
 export function MapCanvas({
@@ -45,6 +62,8 @@ export function MapCanvas({
   height,
   playerViewport,
   onHexHover,
+  localView,
+  onLocalViewChange,
 }: MapCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -62,6 +81,28 @@ export function MapCanvas({
   // Track latest state for operation completion (avoids stale closure issues)
   const latestStateRef = useRef(state);
   latestStateRef.current = state;
+
+  // Browser players get their own view. A null/absent localView means the
+  // player default (fit to their screen); the Tauri player window has no
+  // callback and keeps the calibrated GM player framing.
+  const localPlayer = isPlayerView && Boolean(onLocalViewChange);
+  const safeGridSize = state.map.gridSize || 50;
+  const playerScale = state.calibration.pixelsPerInch / safeGridSize;
+  const fit = fitView(state.map.imageWidth, state.map.imageHeight, width, height);
+  const gmView = gmPlayerView(
+    state.calibration.pixelsPerInch,
+    safeGridSize,
+    state.playerViewOffset,
+  );
+  const playerView = localView ?? (localPlayer ? fit : gmView);
+  const effectiveScale = isPlayerView ? playerView.scale : state.view.scale;
+  const effectiveOffset = isPlayerView
+    ? { x: playerView.offsetX, y: playerView.offsetY }
+    : { x: state.view.offsetX, y: state.view.offsetY };
+  const playerViewRef = useRef(playerView);
+  playerViewRef.current = playerView;
+  const pointerGestureRef = useRef<PlayerGesture | null>(null);
+  const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
 
   // Persistent fog canvas for incremental updates
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -183,9 +224,21 @@ export function MapCanvas({
     }
   }, [activeImageUrl]);
 
-  // Handle wheel zoom (DM only)
+  // Wheel zoom: the DM changes shared state, the browser player changes only
+  // its local view. The Tauri player window has no local callback and ignores it.
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
-    if (isPlayerView || !onStateChange) return;
+    if (isPlayerView) {
+      if (!onLocalViewChange) return;
+      e.evt.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
+      const factor = Math.exp(-e.evt.deltaY * 0.0015);
+      onLocalViewChange(zoomView(playerViewRef.current, factor, pointer, fit.scale, playerScale));
+      return;
+    }
+    if (!onStateChange) return;
     e.evt.preventDefault();
 
     const stage = stageRef.current;
@@ -218,7 +271,134 @@ export function MapCanvas({
         offsetY: pointer.y - mousePointTo.y * newScale,
       },
     });
-  }, [state, isPlayerView, onStateChange, width, height]);
+  }, [state, isPlayerView, onStateChange, onLocalViewChange, fit.scale, playerScale, width, height]);
+
+  // Browser-player gestures: one pointer pans, two pinch, double-tap fits.
+  // A draggable token is left to Konva, so dragging your own token still moves
+  // the token rather than the view.
+  const stagePointFromEvent = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const stage = stageRef.current;
+    if (!stage) return null;
+    const rect = stage.container().getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }, []);
+
+  const draggableTokenAt = useCallback((point: { x: number; y: number }) => {
+    const stage = stageRef.current;
+    if (!stage) return false;
+    let node: Konva.Node | null = stage.getIntersection(point);
+    while (node && node !== stage) {
+      if (node.name() === 'token') return node.draggable();
+      node = node.getParent();
+    }
+    return false;
+  }, []);
+
+  const handlePlayerPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!localPlayer || !onLocalViewChange) return;
+    const point = stagePointFromEvent(event);
+    if (!point || draggableTokenAt(point)) return;
+
+    let gesture = pointerGestureRef.current;
+    if (!gesture) {
+      gesture = {
+        pointers: new Map(),
+        startView: playerViewRef.current,
+        startPoint: point,
+        startDistance: 1,
+        startMid: point,
+        moved: false,
+        pinched: false,
+        startTime: performance.now(),
+      };
+    }
+    gesture.pointers.set(event.pointerId, point);
+    if (gesture.pointers.size === 1) {
+      gesture.startView = playerViewRef.current;
+      gesture.startPoint = point;
+      gesture.startDistance = 1;
+      gesture.startMid = point;
+      gesture.moved = false;
+      gesture.pinched = false;
+      gesture.startTime = performance.now();
+    } else if (gesture.pointers.size === 2) {
+      const [a, b] = Array.from(gesture.pointers.values());
+      gesture.startView = playerViewRef.current;
+      gesture.startDistance = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+      gesture.startMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      gesture.moved = true;
+      gesture.pinched = true;
+    }
+    pointerGestureRef.current = gesture;
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      /* the browser may have already released it */
+    }
+    event.preventDefault();
+  }, [draggableTokenAt, localPlayer, onLocalViewChange, stagePointFromEvent]);
+
+  const handlePlayerPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = pointerGestureRef.current;
+    if (!localPlayer || !onLocalViewChange || !gesture || !gesture.pointers.has(event.pointerId)) return;
+    const point = stagePointFromEvent(event);
+    if (!point) return;
+    gesture.pointers.set(event.pointerId, point);
+
+    if (gesture.pointers.size >= 2) {
+      const [a, b] = Array.from(gesture.pointers.values());
+      const distance = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      onLocalViewChange(
+        pinchView(gesture.startView, gesture.startDistance, gesture.startMid, distance, mid, fit.scale, playerScale),
+      );
+      gesture.moved = true;
+      gesture.pinched = true;
+    } else {
+      const dx = point.x - gesture.startPoint.x;
+      const dy = point.y - gesture.startPoint.y;
+      if (Math.hypot(dx, dy) > 4) gesture.moved = true;
+      if (gesture.moved) onLocalViewChange(panView(gesture.startView, dx, dy));
+    }
+    event.preventDefault();
+  }, [fit.scale, localPlayer, onLocalViewChange, playerScale, stagePointFromEvent]);
+
+  const handlePlayerPointerEnd = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = pointerGestureRef.current;
+    if (!localPlayer || !onLocalViewChange || !gesture) return;
+    gesture.pointers.delete(event.pointerId);
+    if (gesture.pointers.size === 0) {
+      const point = stagePointFromEvent(event);
+      const now = performance.now();
+      if (point && !gesture.moved && !gesture.pinched && now - gesture.startTime < 350) {
+        const last = lastTapRef.current;
+        if (last && now - last.time < 320 && Math.hypot(point.x - last.x, point.y - last.y) < 30) {
+          onLocalViewChange(fit);
+          lastTapRef.current = null;
+        } else {
+          lastTapRef.current = { time: now, x: point.x, y: point.y };
+        }
+      } else {
+        lastTapRef.current = null;
+      }
+      pointerGestureRef.current = null;
+    }
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      /* pointer capture may already be gone */
+    }
+  }, [fit, localPlayer, onLocalViewChange, stagePointFromEvent]);
+
+  const handlePlayerPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    pointerGestureRef.current = null;
+    lastTapRef.current = null;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      /* pointer capture may already be gone */
+    }
+  }, []);
 
   // Get grid position from pointer
   const getGridPosition = useCallback((stage: Konva.Stage) => {
@@ -484,18 +664,6 @@ export function MapCanvas({
     });
   }, [isPlayerView, onStateChange, state]);
 
-  // Calculate scale for player view calibration (guard against division by zero)
-  const safeGridSize = state.map.gridSize || 50;
-  const playerScale = isPlayerView
-    ? (state.calibration.pixelsPerInch / safeGridSize)
-    : 1;
-
-  const effectiveScale = isPlayerView ? playerScale : state.view.scale;
-  // Player view uses playerViewOffset (in map coords), DM view uses view offset (in screen coords)
-  const effectiveOffset = isPlayerView
-    ? { x: -state.playerViewOffset.x * playerScale, y: -state.playerViewOffset.y * playerScale }
-    : { x: state.view.offsetX, y: state.view.offsetY };
-
   // Screen-space geometry for the text-edit overlay (DM view only).
   const editScale = state.view.scale;
   const editScreen = editingLabel
@@ -507,7 +675,20 @@ export function MapCanvas({
     : null;
 
   return (
-    <div style={{ position: 'relative', width, height }}>
+    <div
+      style={{
+        position: 'relative',
+        width,
+        height,
+        touchAction: localPlayer ? 'none' : undefined,
+        cursor: localPlayer ? 'grab' : undefined,
+      }}
+      data-player-view={localPlayer ? `${effectiveScale.toFixed(4)}:${effectiveOffset.x.toFixed(1)}:${effectiveOffset.y.toFixed(1)}` : undefined}
+      onPointerDown={localPlayer ? handlePlayerPointerDown : undefined}
+      onPointerMove={localPlayer ? handlePlayerPointerMove : undefined}
+      onPointerUp={localPlayer ? handlePlayerPointerEnd : undefined}
+      onPointerCancel={localPlayer ? handlePlayerPointerCancel : undefined}
+    >
     <Stage
       ref={stageRef}
       width={width}

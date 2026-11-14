@@ -51,6 +51,12 @@ Only a genuine `SavedMapState` is accepted as `.json`; any other JSON is rejecte
 with a readable message and the current table is left untouched. A cartographer
 "both views" bundle (also `.json`) is not supported in the browser yet.
 
+Each browser player can pan and zoom their own view: drag to pan, wheel or pinch
+to zoom, double-tap or **Fit** for the whole map, and **GM view** for the GM's
+calibration/framing. That viewport lives only in the player's React component; it
+is not in `AppState`, not sent over the WebSocket, and not broadcast to other
+players. One player moving their view cannot move anyone else's.
+
 ## Authority and identity
 
 The server owns the state (`server/data/state.json` and uploaded media in
@@ -123,6 +129,8 @@ used: this is a LAN feature.
   uploaded map, Aria's token, HP and owner.
 - `screenshots/network-player.png` — the player browser for Aria after moving the
   token to a new cell and setting HP to 12; the GM state reflects the same token.
+- `screenshots/network-player-pan-zoom.png` — a phone-sized player browser panned
+  and zoomed into the map, with the local **Fit** and **GM view** controls.
 
 The deployed GM key lives in `server.env` on pop (`chmod 600`), not in this
 repository; use it in the GM join form. The LAN firewall on pop allows TCP 8092
