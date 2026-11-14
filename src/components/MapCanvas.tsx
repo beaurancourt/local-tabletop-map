@@ -20,6 +20,7 @@ interface MapCanvasProps {
   onTextLabelCommit?: (id: string, before: TextLabel | null, after: TextLabel | null) => void; // Text label add/edit/remove (for history)
   onTokenPlace?: (gridX: number, gridY: number) => void;
   onTokenMove?: (id: string, gridX: number, gridY: number) => void;
+  canMoveToken?: (token: Token) => boolean;
   width: number;
   height: number;
   playerViewport?: PlayerViewport | null;
@@ -39,6 +40,7 @@ export function MapCanvas({
   onTextLabelCommit,
   onTokenPlace,
   onTokenMove,
+  canMoveToken,
   width,
   height,
   playerViewport,
@@ -637,7 +639,9 @@ export function MapCanvas({
           const nameSize = Math.max(18, gridSize * 0.36);
           const hpSize = Math.max(13, gridSize * 0.24);
           const ratio = healthRatio(token.hp, token.maxHp);
-          const draggable = !isPlayerView && toolState?.activeTool === 'token';
+          const draggable = isPlayerView
+            ? Boolean(canMoveToken?.(token))
+            : toolState?.activeTool === 'token';
           const tags = token.tags ?? [];
           const tagFontSize = Math.max(12, gridSize * 0.2);
           const tagHeight = tagFontSize + 8 / effectiveScale;

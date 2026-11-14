@@ -2,6 +2,14 @@
 
 A lightweight virtual tabletop application for running tabletop RPGs on a TV. Features a DM view for controlling the map and a separate player view designed for display on a TV or second monitor.
 
+## LAN play
+
+The browser client and the Node server let phones/laptops on the LAN join the
+table, move their own tokens and change their own HP. The server lives on `pop`
+as `http://pop.local:8092`; see [docs/network.md](docs/network.md) for identity,
+authority, deployment, the GM key and the HTTPS/PWA option. The desktop Tauri DM
+remains the full offline application.
+
 ## Screenshots
 
 ### GM View
